@@ -1,0 +1,3 @@
+[ ]  Compile-time genration of zero-initialized board
+[ ]  User input of column
+[ ]  Clear screen upon rendering of the board
