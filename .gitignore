@@ -1,0 +1,8 @@
+# Cargo
+Cargo.lock
+
+# IDE
+.vscode
+
+# Build
+target
