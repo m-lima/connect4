@@ -33,14 +33,7 @@ impl std::fmt::Display for Board {
 }
 
 impl Board {
-    pub fn new() -> Board{Board{ cells: [
-    [Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE],
-    [Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE],
-    [Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE],
-    [Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE],
-    [Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE],
-    [Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE],
-    [Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE],
-    [Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE, Player::NONE],
-    ]}}
+    pub fn new() -> Board {
+        Board{ cells: [[Player::NONE; 8]; 8] }
+    }
 }
