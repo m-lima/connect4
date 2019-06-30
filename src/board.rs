@@ -9,7 +9,7 @@ impl std::fmt::Display for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Player::NONE => write!(f, "  "),
-            Player::ONE => write!(f, "██"),
+            Player::ONE => write!(f, "▓▓"),
             Player::TWO => write!(f, "░░"),
         }
     }
