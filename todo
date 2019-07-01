@@ -1,3 +1,5 @@
-[ ]  User input of column
-[ ]  Clear screen upon rendering of the board
+[ ]  AI opnent
+[ ]  Highlight winning connection
+[X]  User input of column
+[X]  Clear screen upon rendering of the board
 [X]  Compile-time genration of zero-initialized board
