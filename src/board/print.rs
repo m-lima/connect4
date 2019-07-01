@@ -20,7 +20,14 @@ impl std::fmt::Display for Board {
             write!(fmt, "|\n")?;
         }
 
-        write!(fmt, "-------------------------\n")?;
-        write!(fmt, "  1  2  3  4  5  6  7  8")
+        for i in 0..Board::SIZE {
+            write!(fmt, "---")?;
+        }
+        write!(fmt, "-\n")?;
+
+        for i in 0..Board::SIZE {
+            write!(fmt, " {:2}", i + 1)?;
+        }
+        write!(fmt, "\n")
     }
 }
