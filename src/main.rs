@@ -22,8 +22,12 @@ fn print_board(board: &board::Board) {
     println!("{}", board);
 }
 
-fn decrement_or_overflow(value: u8) -> usize {
-    (value as i8 - 1) as usize
+fn decrement_and_reject_zeros(value: usize) -> Result<usize, &'static str> {
+    if value > 0 {
+        Ok(value - 1)
+    } else {
+        Err(board::PlacementError::NotAColumn.to_string())
+    }
 }
 
 fn main() {
@@ -45,9 +49,9 @@ fn main() {
                 if v == "q" {
                     std::process::exit(0);
                 }
-                v.parse::<u8>().map_err(|_| "not a number")
+                v.parse::<usize>().map_err(|_| "not a number")
             })
-            .map(&decrement_or_overflow)
+            .and_then(&decrement_and_reject_zeros)
             .and_then(|v| board.place(current_player, v).map_err(|e| e.to_string()))
             .map(|p| board.check_victory(p))
             .and_then(|v| {

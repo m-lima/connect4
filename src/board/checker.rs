@@ -10,12 +10,14 @@ pub enum Direction {
 }
 
 impl Vector<usize> {
-    fn shift(&self, direction: &Vector<i8>) -> Vector<usize> {
-        // Decrement or overflow
-        // Static checks prevent overflown value from being valid
-        Vector {
-            column: (self.column as i8 + direction.column) as usize,
-            row: (self.row as i8 + direction.row) as usize,
+    fn shift(&self, direction: &Vector<i8>) -> Option<Vector<usize>> {
+        if (direction.row < 0 && self.row == 0) || (direction.column < 0 && direction.column == 0) {
+            None
+        } else {
+            Some(Vector {
+                column: self.column + direction.column as usize,
+                row: self.row + direction.row as usize,
+            })
         }
     }
 }
@@ -49,21 +51,17 @@ fn is_same_player(board: &Board, current: &Vector<usize>, player: Player) -> boo
 fn measure_sequence(
     board: &Board,
     direction: &Vector<i8>,
-    current: Vector<usize>,
+    current: Option<Vector<usize>>,
     player: Player,
     counter: u8,
 ) -> u8 {
-    if counter >= 4 || !is_same_player(&board, &current, player) {
-        counter
-    } else {
-        measure_sequence(
-            &board,
-            &direction,
-            current.shift(direction),
-            player,
-            counter + 1,
+    current
+        .filter(|_| counter < 4)
+        .filter(|c| is_same_player(&board, &c, player))
+        .map_or_else(
+            || counter,
+            |c| measure_sequence(&board, &direction, c.shift(direction), player, counter + 1),
         )
-    }
 }
 
 pub fn check_victory(
