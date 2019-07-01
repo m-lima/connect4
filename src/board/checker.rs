@@ -15,8 +15,8 @@ impl Vector<usize> {
             None
         } else {
             Some(Vector {
-                column: self.column + direction.column as usize,
-                row: self.row + direction.row as usize,
+                column: (self.column as i8 + direction.column) as usize,
+                row: (self.row as i8 + direction.row) as usize,
             })
         }
     }

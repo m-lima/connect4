@@ -1,18 +1,18 @@
 use crate::board;
 
-fn defend(player: board::Player, board: &board::Board) -> Option<i8> {
+fn defend(player: board::Player, board: &board::Board) -> Option<usize> {
     Option::None
 }
 
-fn attack(player: board::Player, board: &board::Board) -> Option<i8> {
+fn attack(player: board::Player, board: &board::Board) -> Option<usize> {
     Option::None
 }
 
-fn random(board: &board::Board) -> Option<i8> {
-    let column = rand::random::<i8>() % board::Board::SIZE as i8;
+fn random(board: &board::Board) -> Option<usize> {
+    let column = rand::random::<usize>() % board::Board::SIZE;
     for i in 0..board::Board::SIZE {
-        if !board.full_column((column + i as i8) % board::Board::SIZE as i8) {
-            return Some((column + i as i8) % board::Board::SIZE as i8);
+        if !board.full_column((column + i) % board::Board::SIZE) {
+            return Some((column + i) % board::Board::SIZE);
         }
     }
 
@@ -28,7 +28,7 @@ impl Ai {
         Ai { player }
     }
 
-    pub fn next_move(&self, board: &board::Board) -> Option<i8> {
+    pub fn next_move(&self, board: &board::Board) -> Option<usize> {
         defend(self.player, &board)
             .or_else(|| attack(self.player, &board))
             .or_else(|| random(&board))
