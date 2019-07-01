@@ -52,14 +52,18 @@ impl Board {
         }
     }
 
-    fn _place(&mut self, player: Player, position: Vector<usize>) -> Option<Vector<usize>> {
+    fn _place(
+        &mut self,
+        player: Player,
+        position: Vector<usize>,
+    ) -> Result<Vector<usize>, PlacementError> {
         if self.cells[position.row][position.column] == Player::None {
             self.cells[position.row][position.column] = player;
-            Some(position)
-        } else if position.row != 0 {
+            Ok(position)
+        } else if position.row > 0 {
             self._place(player, position.decrement_row())
         } else {
-            None
+            Err(PlacementError::ColumnFull)
         }
     }
 
@@ -79,7 +83,6 @@ impl Board {
                 column,
             },
         )
-        .ok_or_else(|| PlacementError::ColumnFull)
     }
 
     pub fn check_victory(&self, last_place: Vector<usize>) -> bool {
