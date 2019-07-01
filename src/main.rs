@@ -1,3 +1,4 @@
+// mod ai;
 mod board;
 
 fn get_input() -> Result<String, &'static str> {
@@ -21,6 +22,10 @@ fn print_board(board: &board::Board) {
     println!("{}", board);
 }
 
+fn decrement_or_overflow(value: u8) -> usize {
+    (value as i8 - 1) as usize
+}
+
 fn main() {
     let mut board = board::Board::new();
     let mut current_player = board::Player::One;
@@ -42,12 +47,8 @@ fn main() {
                 }
                 v.parse::<u8>().map_err(|_| "not a number")
             })
-            .map(|v| v as i8)
-            .and_then(|v| {
-                board
-                    .place(current_player, v - 1)
-                    .map_err(|e| e.to_string())
-            })
+            .map(&decrement_or_overflow)
+            .and_then(|v| board.place(current_player, v).map_err(|e| e.to_string()))
             .map(|p| board.check_victory(p))
             .and_then(|v| {
                 print_board(&board);
@@ -62,15 +63,17 @@ fn main() {
     }
 }
 
-#[test]
-fn should_not_crash() {
-    let _board = board::Board::new();
-}
+#[cfg(test)]
+mod main {
+    mod tests {
+        use board;
 
-#[test]
-fn player_should_swap() {
-    let mut player = board::Player::One;
-    swap_player(&mut player);
+        #[test]
+        fn player_should_swap() {
+            let mut player = board::Player::One;
+            ::swap_player(&mut player);
 
-    assert_eq!(player, board::Player::Two);
+            assert_eq!(player, board::Player::Two);
+        }
+    }
 }

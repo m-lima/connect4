@@ -3,7 +3,7 @@ use board::Player;
 use board::Vector;
 
 #[test]
-fn check_victory_horizontal() {
+fn should_detect_horizontal_victory() {
     let mut board = Board::new();
     board.cells[2][2] = Player::One;
     board.cells[2][3] = Player::One;
@@ -13,7 +13,7 @@ fn check_victory_horizontal() {
 }
 
 #[test]
-fn check_victory_vertical() {
+fn should_detect_vertical_victory() {
     let mut board = Board::new();
     board.cells[2][2] = Player::One;
     board.cells[3][2] = Player::One;
@@ -23,7 +23,7 @@ fn check_victory_vertical() {
 }
 
 #[test]
-fn check_victory_up_down() {
+fn should_detect_up_down_victory() {
     let mut board = Board::new();
     board.cells[4][4] = Player::One;
     board.cells[5][3] = Player::One;
@@ -33,7 +33,7 @@ fn check_victory_up_down() {
 }
 
 #[test]
-fn check_victory_down_up() {
+fn should_detect_down_up_victory() {
     let mut board = Board::new();
     board.cells[2][2] = Player::One;
     board.cells[3][3] = Player::One;
@@ -43,7 +43,7 @@ fn check_victory_down_up() {
 }
 
 #[test]
-fn check_victory_fail() {
+fn should_not_detect_victory() {
     let mut board = Board::new();
     board.cells[2][2] = Player::One;
     board.cells[4][3] = Player::One;

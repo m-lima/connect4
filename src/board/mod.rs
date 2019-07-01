@@ -1,5 +1,5 @@
-mod print;
 mod checker;
+mod print;
 
 #[cfg(test)]
 mod tests;
@@ -25,17 +25,26 @@ impl PlacementError {
     }
 }
 
-pub struct Vector {
-    column: i8,
-    row: i8,
+pub struct Vector<T> {
+    pub column: T,
+    pub row: T,
+}
+
+impl Vector<usize> {
+    fn decrement_row(&self) -> Vector<usize> {
+        Vector {
+            row: self.row - 1,
+            column: self.column,
+        }
+    }
 }
 
 pub struct Board {
-    cells: [[Player; Board::SIZE as usize]; Board::SIZE as usize],
+    cells: [[Player; Board::SIZE]; Board::SIZE],
 }
 
 impl Board {
-    const SIZE: usize = 8;
+    pub const SIZE: usize = 8;
 
     pub fn new() -> Board {
         Board {
@@ -43,30 +52,46 @@ impl Board {
         }
     }
 
-    pub fn place(&mut self, player: Player, column: i8) -> Result<Vector, PlacementError> {
-        if column as usize >= Board::SIZE {
+    fn _place(&mut self, player: Player, position: Vector<usize>) -> Option<Vector<usize>> {
+        if self.cells[position.row][position.column] == Player::None {
+            self.cells[position.row][position.column] = player;
+            Some(position)
+        } else if position.row != 0 {
+            self._place(player, position.decrement_row())
+        } else {
+            None
+        }
+    }
+
+    pub fn place(
+        &mut self,
+        player: Player,
+        column: usize,
+    ) -> Result<Vector<usize>, PlacementError> {
+        if column >= Board::SIZE {
             return Err(PlacementError::NotAColumn);
         }
 
-        for i in (0..Board::SIZE).rev() {
-            if self.cells[i][column as usize] == Player::None {
-                self.cells[i][column as usize] = player;
-                return Ok(Vector {
-                    column,
-                    row: i as i8,
-                });
-            }
-        }
-
-        Err(PlacementError::ColumnFull)
+        self._place(
+            player,
+            Vector {
+                row: Board::SIZE - 1,
+                column,
+            },
+        )
+        .ok_or_else(|| PlacementError::ColumnFull)
     }
 
-    pub fn check_victory(&self, last_place: Vector) -> bool {
-        let player = self.cells[last_place.row as usize][last_place.column as usize];
+    pub fn check_victory(&self, last_place: Vector<usize>) -> bool {
+        let player = self.cells[last_place.row][last_place.column];
 
         checker::check_victory(&self, checker::Direction::Horizontal, &last_place, player)
             || checker::check_victory(&self, checker::Direction::Vertical, &last_place, player)
             || checker::check_victory(&self, checker::Direction::UpDown, &last_place, player)
             || checker::check_victory(&self, checker::Direction::DownUp, &last_place, player)
+    }
+
+    pub fn full_column(&self, column: usize) -> bool {
+        self.cells[0][column] != Player::None
     }
 }

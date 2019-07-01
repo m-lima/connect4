@@ -1,5 +1,5 @@
-use board::Player;
 use board::Board;
+use board::Player;
 
 impl std::fmt::Display for Player {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
