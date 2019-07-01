@@ -37,17 +37,19 @@ fn main() {
                 }
                 v.parse::<u8>().map_err(|_| "not a number")
             })
+            .map(|v| v as i8)
             .and_then(|v| {
-                if v == 0 {
-                    Err("cannot select column zero")
-                } else {
-                    board
-                        .place(current_player, v - 1)
-                        .map_err(|e| e.to_string())
-                }
+                board
+                    .place(current_player, v - 1)
+                    .map_err(|e| e.to_string())
             })
-            .and_then(|_| {
+            .map(|p| board.check_victory(p))
+            .and_then(|v| {
                 println!("{}", board);
+                if v {
+                    println!("Congratulaions {}! You own!", current_player);
+                    std::process::exit(0);
+                }
                 swap_player(&mut current_player);
                 Ok(())
             })
