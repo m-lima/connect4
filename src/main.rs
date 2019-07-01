@@ -16,10 +16,15 @@ fn swap_player(player: &mut board::Player) {
     };
 }
 
+fn print_board(board: &board::Board) {
+    print!("{}[2J", 27 as char);
+    println!("{}", board);
+}
+
 fn main() {
     let mut board = board::Board::new();
     let mut current_player = board::Player::One;
-    println!("{}", board);
+    print_board(&board);
 
     loop {
         use std::io::Write;
@@ -45,7 +50,7 @@ fn main() {
             })
             .map(|p| board.check_victory(p))
             .and_then(|v| {
-                println!("{}", board);
+                print_board(&board);
                 if v {
                     println!("Congratulaions {}! You own!", current_player);
                     std::process::exit(0);
