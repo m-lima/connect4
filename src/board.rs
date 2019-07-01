@@ -1,16 +1,30 @@
-#[derive(Debug, Copy, Clone)]
-enum Player {
-    NONE,
-    ONE,
-    TWO,
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Player {
+    None,
+    One,
+    Two,
 }
 
 impl std::fmt::Display for Player {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Player::NONE => write!(f, "  "),
-            Player::ONE => write!(f, "▓▓"),
-            Player::TWO => write!(f, "░░"),
+            Player::None => write!(fmt, "  "),
+            Player::One => write!(fmt, "▓▓"),
+            Player::Two => write!(fmt, "░░"),
+        }
+    }
+}
+
+pub enum PlacementError {
+    NotAColumn,
+    ColumnFull,
+}
+
+impl PlacementError {
+    pub fn to_string(&self) -> &'static str {
+        match self {
+            PlacementError::NotAColumn => "not a column",
+            PlacementError::ColumnFull => "column full",
         }
     }
 }
@@ -20,20 +34,36 @@ pub struct Board {
 }
 
 impl std::fmt::Display for Board {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         for row in self.cells.iter() {
             for cell in row.iter() {
-                write!(f, "|{}", cell)?;
+                write!(fmt, "|{}", cell)?;
             }
-            write!(f, "|\n")?;
+            write!(fmt, "|\n")?;
         }
 
-        write!(f, "-------------------------")
+        write!(fmt, "-------------------------\n")?;
+        write!(fmt, "  1  2  3  4  5  6  7  8")
     }
 }
 
 impl Board {
     pub fn new() -> Board {
-        Board{ cells: [[Player::NONE; 8]; 8] }
+        Board{ cells: [[Player::None; 8]; 8] }
+    }
+
+    pub fn place(&mut self, player: Player, column: u8) -> Result<(), PlacementError> {
+        if column as usize >= self.cells.len() {
+            return Err(PlacementError::NotAColumn);
+        }
+
+        for i in self.cells.len()..0 {
+            if self.cells[i][column as usize] == Player::None {
+                self.cells[i][column as usize] = player;
+                return Ok(());
+            }
+        }
+
+        Err(PlacementError::ColumnFull)
     }
 }
