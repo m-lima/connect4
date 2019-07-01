@@ -57,7 +57,7 @@ impl Board {
             return Err(PlacementError::NotAColumn);
         }
 
-        for i in self.cells.len()..0 {
+        for i in (0..self.cells.len()).rev() {
             if self.cells[i][column as usize] == Player::None {
                 self.cells[i][column as usize] = player;
                 return Ok(());
