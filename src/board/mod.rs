@@ -1,29 +1,7 @@
-mod checker;
-mod print;
-
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Player {
-    None,
-    One,
-    Two,
-}
-
-pub enum PlacementError {
-    NotAColumn,
-    ColumnFull,
-}
-
-impl PlacementError {
-    pub fn to_string(&self) -> &'static str {
-        match self {
-            PlacementError::NotAColumn => "not a column",
-            PlacementError::ColumnFull => "column full",
-        }
-    }
-}
+pub const SIZE: usize = 8;
 
 pub struct Vector<T> {
     pub column: T,
@@ -37,64 +15,154 @@ impl Vector<usize> {
             column: self.column,
         }
     }
-}
-
-pub struct Board {
-    cells: [[Player; Board::SIZE]; Board::SIZE],
-}
-
-impl Board {
-    pub const SIZE: usize = 8;
-
-    pub fn new() -> Board {
-        Board {
-            cells: [[Player::None; Board::SIZE]; Board::SIZE],
-        }
-    }
-
-    fn _place(
-        &mut self,
-        player: Player,
-        position: Vector<usize>,
-    ) -> Result<Vector<usize>, PlacementError> {
-        if self.cells[position.row][position.column] == Player::None {
-            self.cells[position.row][position.column] = player;
-            Ok(position)
-        } else if position.row > 0 {
-            self._place(player, position.decrement_row())
+    fn shift(&self, direction: &Vector<i8>) -> Option<Vector<usize>> {
+        if (direction.row < 0 && self.row == 0) || (direction.column < 0 && direction.column == 0) {
+            None
         } else {
-            Err(PlacementError::ColumnFull)
+            Some(Vector {
+                column: (self.column as i8 + direction.column) as usize,
+                row: (self.row as i8 + direction.row) as usize,
+            })
+        }
+    }
+}
+
+impl Vector<i8> {
+    fn invert(&self) -> Vector<i8> {
+        Vector {
+            column: self.column * -1,
+            row: self.row * -1,
+        }
+    }
+    fn from_direction(direction: Direction) -> Vector<i8> {
+        match direction {
+            Direction::Vertical => Vector { row: -1, column: 0 },
+            Direction::Horizontal => Vector { row: 0, column: -1 },
+            Direction::UpDown => Vector {
+                row: -1,
+                column: -1,
+            },
+            Direction::DownUp => Vector { row: -1, column: 1 },
+        }
+    }
+}
+
+enum Direction {
+    Vertical,
+    Horizontal,
+    UpDown,
+    DownUp,
+}
+
+pub struct Board<T> {
+    cells: [[T; SIZE]; SIZE],
+    available: Vec<usize>,
+}
+
+impl<T: Default + Copy + PartialEq> Board<T> {
+    pub fn new() -> Board<T> {
+        Board {
+            cells: [[T::default(); SIZE]; SIZE],
+            available: (0..SIZE).collect(),
         }
     }
 
-    pub fn place(
-        &mut self,
-        player: Player,
-        column: usize,
-    ) -> Result<Vector<usize>, PlacementError> {
-        if column >= Board::SIZE {
-            return Err(PlacementError::NotAColumn);
+    fn place_internal(&mut self, token: T, position: Vector<usize>) -> Vector<usize> {
+        if self.cells[position.row][position.column] == T::default() {
+            self.cells[position.row][position.column] = token;
+            position
+        } else {
+            self.place_internal(token, position.decrement_row())
         }
+    }
 
-        self._place(
-            player,
+    pub fn place(&mut self, token: T, index: usize) -> Vector<usize> {
+        let column = self.available[index];
+        let position = self.place_internal(
+            token,
             Vector {
-                row: Board::SIZE - 1,
+                row: SIZE - 1,
                 column,
             },
-        )
+        );
+        if position.row == 0 {
+            self.available.remove(index);
+        }
+        position
+    }
+
+    fn measure_sequence(
+        &self,
+        direction: &Vector<i8>,
+        current: Option<Vector<usize>>,
+        token: T,
+        counter: u8,
+    ) -> u8 {
+        current
+            .filter(|_| counter < 4)
+            .filter(|c| c.column < SIZE && c.row < SIZE && self.cells[c.row][c.column] == token)
+            .map_or_else(
+                || counter,
+                |c| self.measure_sequence(&direction, c.shift(direction), token, counter + 1),
+            )
+    }
+
+    fn check_victory_internal(
+        &self,
+        direction: Direction,
+        current: &Vector<usize>,
+        token: T,
+    ) -> bool {
+        let vector = Vector::from_direction(direction);
+        let backwards_vector = vector.invert();
+        self.measure_sequence(
+            &vector,
+            current.shift(&vector),
+            token,
+            self.measure_sequence(
+                &backwards_vector,
+                current.shift(&backwards_vector),
+                token,
+                1,
+            ),
+        ) >= 4
     }
 
     pub fn check_victory(&self, last_place: Vector<usize>) -> bool {
-        let player = self.cells[last_place.row][last_place.column];
+        let token = self.cells[last_place.row][last_place.column];
 
-        checker::check_victory(&self, checker::Direction::Horizontal, &last_place, player)
-            || checker::check_victory(&self, checker::Direction::Vertical, &last_place, player)
-            || checker::check_victory(&self, checker::Direction::UpDown, &last_place, player)
-            || checker::check_victory(&self, checker::Direction::DownUp, &last_place, player)
+        self.check_victory_internal(Direction::Horizontal, &last_place, token)
+            || self.check_victory_internal(Direction::Vertical, &last_place, token)
+            || self.check_victory_internal(Direction::UpDown, &last_place, token)
+            || self.check_victory_internal(Direction::DownUp, &last_place, token)
     }
 
-    pub fn full_column(&self, column: usize) -> bool {
-        self.cells[0][column] != Player::None
+    pub fn available_columns(&self) -> &Vec<usize> {
+        &self.available
+    }
+
+    pub fn has_available_columns(&self) -> bool {
+        !self.available.is_empty()
+    }
+}
+
+impl<T: std::fmt::Display> std::fmt::Display for Board<T> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for row in self.cells.iter() {
+            for cell in row.iter() {
+                write!(fmt, "|{}", cell)?;
+            }
+            write!(fmt, "|\n")?;
+        }
+
+        for _ in 0..SIZE {
+            write!(fmt, "---")?;
+        }
+        write!(fmt, "-\n")?;
+
+        for i in 0..SIZE {
+            write!(fmt, " {:2}", i + 1)?;
+        }
+        write!(fmt, "\n")
     }
 }
