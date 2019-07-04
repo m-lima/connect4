@@ -1,5 +1,3 @@
-use player::Player;
-
 mod board;
 mod player;
 mod token;
@@ -10,10 +8,7 @@ enum Outcome {
     Tie,
 }
 
-fn turn(
-    board: &mut board::Board<token::Token>,
-    player: &impl player::Player<token::Token>,
-) -> Outcome {
+fn turn(board: &mut board::Board<token::Token>, player: &player::Player<token::Token>) -> Outcome {
     if board.has_available_columns() {
         let next_move = player.next_move(board.available_columns());
         let place_position = board.place(player.token(), next_move);
@@ -29,40 +24,24 @@ fn turn(
 
 fn main() {
     let mut board = board::Board::new();
-    let mut white_is_current_player = true;
 
     // TODO: Dynamically set the players based on args
-    let players = player::Players::<
+    let mut opponents = player::Opponents::<
         token::Token,
-        player::human::Human<token::Token>,
+        player::ai::Ai<token::Token>,
         player::human::Human<token::Token>,
     >::new(token::Token::White, token::Token::Black);
 
     println!("{}[2J{}", 27 as char, board);
 
     loop {
-        // TODO: Less verbose and copy/paste fetching of current player
-        let outcome = turn(
-            &mut board,
-            if white_is_current_player {
-                players.white()
-            } else {
-                players.black()
-            },
-        );
+        let current_player = opponents.next();
+        let outcome = turn(&mut board, current_player);
         println!("{}[2J{}", 27 as char, board);
         match outcome {
             Outcome::Nothing => (),
             Outcome::Victory => {
-                // TODO: Less verbose and copy/paste fetching of current player
-                println!(
-                    "Congratulations, {}! You win!",
-                    if white_is_current_player {
-                        players.white().token()
-                    } else {
-                        players.black().token()
-                    }
-                );
+                println!("Congratulations, {}! You win!", current_player.token());
                 break;
             }
             Outcome::Tie => {
@@ -70,6 +49,5 @@ fn main() {
                 break;
             }
         }
-        white_is_current_player = !white_is_current_player;
     }
 }
