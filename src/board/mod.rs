@@ -149,11 +149,6 @@ impl<T: Default + Copy + PartialEq> Board<T> {
     }
 
     pub fn to_vec(&self) -> &Vec<Vec<T>> {
-        //        let mut matrix = Vec::with_capacity(self.size);
-        //        for row in self.cells.iter() {
-        //            matrix.push(row.to_vec());
-        //        }
-        //        matrix
         &self.cells
     }
 }
