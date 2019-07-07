@@ -3,7 +3,7 @@ pub struct Human<T> {
 }
 
 impl<T: std::fmt::Display + Copy> super::Player<T> for Human<T> {
-    fn next_move(&self, available: &Vec<usize>) -> usize {
+    fn next_move(&self, available: &Vec<usize>, _: &Vec<Vec<T>>) -> usize {
         self.get_input(available).unwrap()
     }
 

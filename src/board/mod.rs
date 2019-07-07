@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod tests;
 
-pub const SIZE: usize = 8;
-
 pub struct Vector<T> {
     pub column: T,
     pub row: T,
@@ -55,15 +53,17 @@ enum Direction {
 }
 
 pub struct Board<T> {
-    cells: [[T; SIZE]; SIZE],
+    size: usize,
+    cells: Vec<Vec<T>>,
     available: Vec<usize>,
 }
 
 impl<T: Default + Copy + PartialEq> Board<T> {
-    pub fn new() -> Board<T> {
+    pub fn new(size: usize) -> Board<T> {
         Board {
-            cells: [[T::default(); SIZE]; SIZE],
-            available: (0..SIZE).collect(),
+            size,
+            cells: vec![vec![T::default(); size]; size],
+            available: (0..size).collect(),
         }
     }
 
@@ -78,10 +78,11 @@ impl<T: Default + Copy + PartialEq> Board<T> {
 
     pub fn place(&mut self, token: T, index: usize) -> Vector<usize> {
         let column = self.available[index];
+        let size = self.size;
         let position = self.place_internal(
             token,
             Vector {
-                row: SIZE - 1,
+                row: size - 1,
                 column,
             },
         );
@@ -100,7 +101,9 @@ impl<T: Default + Copy + PartialEq> Board<T> {
     ) -> u8 {
         current
             .filter(|_| counter < 4)
-            .filter(|c| c.column < SIZE && c.row < SIZE && self.cells[c.row][c.column] == token)
+            .filter(|c| {
+                c.column < self.size && c.row < self.size && self.cells[c.row][c.column] == token
+            })
             .map_or_else(
                 || counter,
                 |c| self.measure_sequence(&direction, c.shift(direction), token, counter + 1),
@@ -144,6 +147,15 @@ impl<T: Default + Copy + PartialEq> Board<T> {
     pub fn has_available_columns(&self) -> bool {
         !self.available.is_empty()
     }
+
+    pub fn to_vec(&self) -> &Vec<Vec<T>> {
+        //        let mut matrix = Vec::with_capacity(self.size);
+        //        for row in self.cells.iter() {
+        //            matrix.push(row.to_vec());
+        //        }
+        //        matrix
+        &self.cells
+    }
 }
 
 impl<T: std::fmt::Display> std::fmt::Display for Board<T> {
@@ -155,12 +167,12 @@ impl<T: std::fmt::Display> std::fmt::Display for Board<T> {
             write!(fmt, "|\n")?;
         }
 
-        for _ in 0..SIZE {
+        for _ in 0..self.size {
             write!(fmt, "---")?;
         }
         write!(fmt, "-\n")?;
 
-        for i in 0..SIZE {
+        for i in 0..self.size {
             write!(fmt, " {:2}", i + 1)?;
         }
         write!(fmt, "\n")

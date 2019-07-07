@@ -2,7 +2,7 @@ pub mod ai;
 pub mod human;
 
 pub trait Player<T> {
-    fn next_move(&self, available: &Vec<usize>) -> usize;
+    fn next_move(&self, available: &Vec<usize>, board: &Vec<Vec<T>>) -> usize;
     fn token(&self) -> T;
 }
 
