@@ -4,6 +4,26 @@ pub struct Board where {
 
 impl Board {
     pub const SIZE: usize = 7;
+
+    pub fn cell(&self, position: &Position) -> &Cell {
+        if position.x < 0 || position.y < 0 || position.x >= Self::SIZE as i8 || position.y >= Self::SIZE as i8 {
+            &Cell::OutOfBounds
+        } else {
+            &self.cells[position.x as usize][position.y as usize]
+        }
+    }
+
+    pub fn get_fall_position(&self, x: i8) -> Position {
+        Position{ x, y: self.get_fall_position_height(Position{ x, y: 0 }) }
+    }
+
+    fn get_fall_position_height(&self, position: Position) -> i8 {
+        if let Cell::Empty = self.cell(&position) {
+            self.get_fall_position_height(position.next(Orientation::S))
+        } else {
+            position.y
+        }
+    }
 }
 
 pub enum Cell {
@@ -22,10 +42,10 @@ pub struct Position {
     y: i8,
 }
 
-impl std::ops::Add<Direction> for &Position {
+impl std::ops::Add<&Direction> for &Position {
     type Output = Position;
 
-    fn add(self, direction: Direction) -> Position {
+    fn add(self, direction: &Direction) -> Position {
         Position{ x: self.x + direction.x, y: self.y + direction.y }
     }
 }
@@ -41,7 +61,7 @@ pub enum Orientation {
     NW,
 }
 
-impl std::ops::Mul<i8> for &Orientation {
+impl std::ops::Mul<i8> for Orientation {
     type Output = Direction;
 
     fn mul(self, amount: i8) -> Direction {
@@ -62,8 +82,8 @@ impl std::ops::Mul<i8> for &Direction {
     }
 }
 
-impl std::convert::From<&Orientation> for Direction {
-    fn from(orientation: &Orientation) -> Self {
+impl std::convert::From<Orientation> for Direction {
+    fn from(orientation: Orientation) -> Self {
         match orientation {
             Orientation::N => Self{ x: 0, y: -1},
             Orientation::NE => Self{ x: 1, y: -1},
@@ -78,20 +98,13 @@ impl std::convert::From<&Orientation> for Direction {
 }
 
 impl Position {
-    pub fn get_cell<'a>(&self, board: &'a Board) -> &'a Cell {
-        if self.x < 0 || self.y < 0 || self.x >= Board::SIZE as i8 || self.y >= Board::SIZE as i8 {
-            &Cell::OutOfBounds
-        } else {
-            &board.cells[self.x as usize][self.y as usize]
-        }
-    }
-
-    pub fn next(&self, orientation: &Orientation) -> Self {
+    pub fn next(&self, orientation: Orientation) -> Self {
         self.translate(orientation, 1)
     }
 
-    pub fn translate(&self, orientation: &Orientation, amount: i8) -> Self {
+    pub fn translate(&self, orientation: Orientation, amount: i8) -> Self {
         let movement = orientation * amount;
-        self + movement
+        self + &movement
     }
 }
+
