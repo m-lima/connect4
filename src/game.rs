@@ -5,21 +5,20 @@ struct Game {
 impl Game {
     fn consecutive_count(&self, player: Player, position: &Position) -> u8 {
         std::cmp::max(
-            self.consecutive_count_per_orientation(player, position, Orientation::S),
+            self.consecutive_count_per_direction(player, position, &Direction::S),
             0,
         )
     }
 
-    fn consecutive_count_per_orientation(
+    fn consecutive_count_per_direction(
         &self,
         player: Player,
         position: &Position,
-        orientation: Orientation,
+        direction: &Direction,
     ) -> u8 {
         if self.board.is_player(player, &position) {
-            let movement = Movement::from(orientation);
-            let reverse = movement.reverse();
-            1 + self.compound_consecutive_count(player, position + &movement, &movement)
+            let reverse = direction.reverse();
+            1 + self.compound_consecutive_count(player, position + &direction, &direction)
                 + self.compound_consecutive_count(player, position + &reverse, &reverse)
         } else {
             0
@@ -30,10 +29,10 @@ impl Game {
         &self,
         player: Player,
         position: Position,
-        movement: &Movement,
+        direction: &Direction,
     ) -> u8 {
         if self.board.is_player(player, &position) {
-            self.compound_consecutive_count(player, &position + movement, movement)
+            self.compound_consecutive_count(player, &position + direction, direction)
         } else {
             0
         }
@@ -70,17 +69,15 @@ impl Board {
     }
 
     fn get_fall_position(&self, x: i8) -> Position {
-        Position {
-            x,
-            y: self.get_fall_position_height(Position { x, y: 0 }),
-        }
+        self.get_fall_position_height(Position { x, y: -1 })
     }
 
-    fn get_fall_position_height(&self, position: Position) -> i8 {
-        if let Cell::Empty = self.cell(&position) {
-            self.get_fall_position_height(&position + &Movement::from(Orientation::S))
+    fn get_fall_position_height(&self, position: Position) -> Position {
+        let floor = &position + &Direction::S;
+        if Cell::Empty == self.cell(&floor) {
+            self.get_fall_position_height(floor)
         } else {
-            position.y - 1
+            position
         }
     }
 }
@@ -104,32 +101,23 @@ struct Position {
     y: i8,
 }
 
-impl std::ops::Add<&Movement> for &Position {
+impl std::ops::Add<&Direction> for &Position {
     type Output = Position;
 
-    fn add(self, movement: &Movement) -> Position {
+    fn add(self, direction: &Direction) -> Position {
         Position {
-            x: self.x + movement.x,
-            y: self.y + movement.y,
+            x: self.x + direction.x,
+            y: self.y + direction.y,
         }
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum Orientation {
-    N,
-    NE,
-    E,
-    SE,
-    S,
-    SW,
-    W,
-    NW,
-}
-
-impl Movement {
+impl Direction {
     fn reverse(&self) -> Self {
-        self * -1
+        Self {
+            x: self.x * -1,
+            y: self.y * -1,
+        }
     }
 
     const N: Self = Self { x: 0, y: -1 };
@@ -142,44 +130,10 @@ impl Movement {
     const NW: Self = Self { x: -1, y: -1 };
 }
 
-impl std::ops::Mul<i8> for Orientation {
-    type Output = Movement;
-
-    fn mul(self, amount: i8) -> Movement {
-        &Movement::from(self) * amount
-    }
-}
-
 #[derive(Debug, Eq, PartialEq)]
-struct Movement {
+struct Direction {
     x: i8,
     y: i8,
-}
-
-impl std::ops::Mul<i8> for &Movement {
-    type Output = Movement;
-
-    fn mul(self, amount: i8) -> Movement {
-        Movement {
-            x: self.x * amount,
-            y: self.y * amount,
-        }
-    }
-}
-
-impl std::convert::From<Orientation> for Movement {
-    fn from(orientation: Orientation) -> Self {
-        match orientation {
-            Orientation::N => Self { x: 0, y: -1 },
-            Orientation::NE => Self { x: 1, y: -1 },
-            Orientation::E => Self { x: 1, y: 0 },
-            Orientation::SE => Self { x: 1, y: 1 },
-            Orientation::S => Self { x: 0, y: 1 },
-            Orientation::SW => Self { x: -1, y: 1 },
-            Orientation::W => Self { x: -1, y: 0 },
-            Orientation::NW => Self { x: -1, y: -1 },
-        }
-    }
 }
 
 #[cfg(test)]
@@ -225,14 +179,14 @@ mod tests {
         #[test]
         fn translation() {
             let position = Position { x: 2, y: 3 };
-            let movement = Movement { x: -9, y: 1 };
-            assert_eq!(&position + &movement, Position { x: -7, y: 4 });
+            let direction = Direction { x: -9, y: 1 };
+            assert_eq!(&position + &direction, Position { x: -7, y: 4 });
         }
 
         #[test]
         fn reversal() {
-            let movement = Movement { x: -9, y: 9 };
-            assert_eq!(movement.reverse(), &Movement::from(Orientation::NE) * 9);
+            let direction = Direction { x: -1, y: 1 };
+            assert_eq!(direction.reverse(), Direction::NE);
         }
     }
 }
