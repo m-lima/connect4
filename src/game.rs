@@ -3,10 +3,22 @@ struct Game {
 }
 
 impl Game {
+    fn new() -> Self {
+        Self {
+            board: Board::new(),
+        }
+    }
+
     fn consecutive_count(&self, player: Player, position: &Position) -> u8 {
         std::cmp::max(
             self.consecutive_count_per_direction(player, position, &Direction::S),
-            0,
+            std::cmp::max(
+                self.consecutive_count_per_direction(player, position, &Direction::E),
+                std::cmp::max(
+                    self.consecutive_count_per_direction(player, position, &Direction::NE),
+                    self.consecutive_count_per_direction(player, position, &Direction::SE),
+                ),
+            ),
         )
     }
 
@@ -32,7 +44,7 @@ impl Game {
         direction: &Direction,
     ) -> u8 {
         if self.board.is_player(player, &position) {
-            self.compound_consecutive_count(player, &position + direction, direction)
+            self.compound_consecutive_count(player, &position + direction, direction) + 1
         } else {
             0
         }
@@ -138,6 +150,41 @@ struct Direction {
 
 #[cfg(test)]
 mod tests {
+    mod game {
+        use super::super::*;
+
+        #[test]
+        fn count() {
+            let mut game = Game::new();
+
+            game.board.cells[2][6] = Cell::Player(Player::Black);
+            game.board.cells[2][5] = Cell::Player(Player::Black);
+            game.board.cells[2][4] = Cell::Player(Player::Black);
+            game.board.cells[2][3] = Cell::Player(Player::White);
+
+            game.board.cells[0][0] = Cell::Player(Player::White);
+            game.board.cells[0][1] = Cell::Player(Player::White);
+
+            game.board.cells[6][6] = Cell::Player(Player::Black);
+            game.board.cells[5][5] = Cell::Player(Player::Black);
+            game.board.cells[4][4] = Cell::Player(Player::Black);
+            game.board.cells[5][4] = Cell::Player(Player::Black);
+
+            assert_eq!(
+                game.consecutive_count(Player::Black, &Position { x: 2, y: 5 }),
+                3
+            );
+            assert_eq!(
+                game.consecutive_count(Player::White, &Position { x: 0, y: 1 }),
+                2
+            );
+            assert_eq!(
+                game.consecutive_count(Player::Black, &Position { x: 5, y: 5 }),
+                3
+            );
+        }
+    }
+
     mod board {
         use super::super::*;
 
