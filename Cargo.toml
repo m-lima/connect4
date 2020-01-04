@@ -1,7 +1,6 @@
 [package]
 name = "connect4"
 version = "0.1.0"
+edition = "2018"
 
-#[dependencies]
-#rand = "0.7"
-#clap = "2"
+[dependencies]
