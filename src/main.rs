@@ -1,4 +1,3 @@
 mod game;
 
-fn main() {
-}
+fn main() {}
