@@ -96,10 +96,6 @@ impl Ai {
                 let score = i32::from(g.last_score());
                 (r.0, score + Self::dig(&g, 1, self.token.flip(), -1))
             })
-            .map(|r| {
-                println!("Score for {}: {}", r.0 + 1, r.1);
-                r
-            })
             .fold(
                 (0, i32::min_value()),
                 |acc, s| {

@@ -13,6 +13,12 @@ impl std::fmt::Display for Error {
     }
 }
 
+pub enum Status {
+    Won,
+    Tie,
+    Ongoing,
+}
+
 pub fn new() -> Game {
     Game {
         board: [[Cell::Empty; Game::SIZE as usize]; Game::SIZE as usize],
@@ -47,8 +53,14 @@ impl Game {
         Ok(self.score(token, &position))
     }
 
-    pub fn is_over(&self) -> bool {
-        self.last_score >= 1 << 3
+    pub fn status(&self) -> Status {
+        if self.last_score >= 1 << 3 {
+            Status::Won
+        } else if !self.board[0].iter().any(|c| *c == Cell::Empty) {
+            Status::Tie
+        } else {
+            Status::Ongoing
+        }
     }
 
     pub fn last_score(&self) -> u8 {

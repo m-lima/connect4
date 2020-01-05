@@ -56,10 +56,18 @@ fn main() {
             player::Result::Ok(input) => match game.place(player.token(), input) {
                 Ok(new_state) => {
                     game = new_state;
-                    if game.is_over() {
-                        print(&game, &None);
-                        println!("Player {} won by playing {}", player.token(), input + 1);
-                        break;
+                    match game.status() {
+                        game::Status::Won => {
+                            print(&game, &None);
+                            println!("Player {} won by playing {}", player.token(), input + 1);
+                            break;
+                        },
+                        game::Status::Tie => {
+                            print(&game, &None);
+                            println!("It's a draw...");
+                            break;
+                        },
+                        _ => {}
                     }
                     turn = !turn;
                 }
