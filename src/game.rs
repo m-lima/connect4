@@ -56,16 +56,15 @@ impl Game {
     }
 
     fn score(&self, token: Token, position: &Position) -> u8 {
-        std::cmp::max(
+        *[
             self.direction_score(token, position, &Direction::S),
-            std::cmp::max(
-                self.direction_score(token, position, &Direction::E),
-                std::cmp::max(
-                    self.direction_score(token, position, &Direction::NE),
-                    self.direction_score(token, position, &Direction::SE),
-                ),
-            ),
-        )
+            self.direction_score(token, position, &Direction::E),
+            self.direction_score(token, position, &Direction::NE),
+            self.direction_score(token, position, &Direction::SE),
+        ]
+        .iter()
+        .max()
+        .unwrap_or(&0)
     }
 
     fn direction_score(&self, token: Token, position: &Position, direction: &Direction) -> u8 {

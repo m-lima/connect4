@@ -93,7 +93,7 @@ impl Ai {
             .filter(|r| r.1.is_ok())
             .map(|r| {
                 let g = r.1.unwrap();
-                let score = i32::from(g.last_score() * Self::DEPTH);
+                let score = i32::from(g.last_score());
                 (r.0, score + Self::dig(&g, 1, self.token.flip(), -1))
             })
             .map(|r| {
@@ -117,22 +117,22 @@ impl Ai {
     fn dig(game: &super::game::Game, depth: u8, token: super::game::Token, factor: i32) -> i32 {
         if depth >= Self::DEPTH - 1 {
             (0..super::game::Game::SIZE)
-                .map(|x| game.plan(token, x))
-                .filter_map(std::result::Result::ok)
-                .map(|s| i32::from(s * Self::DEPTH - depth))
-                .max()
-                .unwrap_or(0)
-                * factor
-        } else {
-            (0..super::game::Game::SIZE)
                 .map(|x| game.place(token, x))
                 .filter_map(std::result::Result::ok)
                 .map(|g| {
-                    let score = factor * i32::from(g.last_score() * Self::DEPTH - depth);
-                    score + Self::dig(&g, depth + 1, token.flip(), -factor)
+                    let score = factor * i32::from(g.last_score());
+                    score + Self::dig(&g, depth - 1, token.flip(), -factor)
                 })
                 .max()
                 .unwrap_or(0)
+        } else {
+            (0..super::game::Game::SIZE)
+                .map(|x| game.plan(token, x))
+                .filter_map(std::result::Result::ok)
+                .map(i32::from)
+                .max()
+                .unwrap_or(0)
+                * factor
         }
     }
 }
