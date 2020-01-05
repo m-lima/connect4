@@ -42,9 +42,13 @@ impl Game {
         })
     }
 
-    pub fn plan(&self, token: Token, x: i8) -> Result<u8, Error> {
+    pub fn _plan(&self, token: Token, x: i8) -> Result<u8, Error> {
         let position = self.fall_position(x)?;
         Ok(self.score(token, &position))
+    }
+
+    pub fn is_over(&self) -> bool {
+        self.last_score >= 1 << 3
     }
 
     pub fn last_score(&self) -> u8 {
@@ -239,7 +243,7 @@ mod tests {
             assert_eq!(game.last_score, 1);
             game = game.place(Token::Black, 2).unwrap();
             assert_eq!(game.last_score, 2);
-            game.place(Token::White, 2).unwrap();
+            game = game.place(Token::White, 2).unwrap();
             assert_eq!(game.last_score, 4);
         }
 
