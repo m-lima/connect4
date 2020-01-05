@@ -70,7 +70,7 @@ pub fn new_ai(token: super::game::Token) -> Ai {
 }
 
 impl Ai {
-    const DEPTH: u8 = 4;
+    const DEPTH: u8 = 10;
 
     fn shuffle_columns() -> Vec<u8> {
         use rand::seq::SliceRandom;
