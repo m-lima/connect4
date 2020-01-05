@@ -2,8 +2,6 @@
 #![deny(clippy::pedantic)]
 #![warn(rust_2018_idioms)]
 
-use crate::player::Player;
-
 mod game;
 mod player;
 
@@ -18,8 +16,7 @@ fn usage() {
     println!("\tconnect4 s\t(Player 1: AI, Player 2: Human)");
 }
 
-fn clear() {
-}
+fn clear() {}
 
 fn print(game: &game::Game, error: &Option<String>) {
     print!("\x1b[2J");
@@ -28,7 +25,6 @@ fn print(game: &game::Game, error: &Option<String>) {
         println!("Error: {}", message);
     }
 
-    println!("Score: {}", game.last_score());
     println!("{}", &game);
 }
 
@@ -37,7 +33,7 @@ fn main() {
 
     let mut turn = false;
     let white = player::new_human(game::Token::White);
-    let black = player::new_human(game::Token::Black);
+    let black = player::new_ai(game::Token::Black);
 
     let mut error: Option<String> = None;
 
@@ -45,7 +41,7 @@ fn main() {
     usage();
 
     loop {
-        let player = if turn { &white } else { &black };
+        let player: &dyn player::Player = if turn { &white } else { &black };
         print(&game, &error);
         error = None;
 

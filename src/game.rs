@@ -15,21 +15,21 @@ impl std::fmt::Display for Error {
 
 pub fn new() -> Game {
     Game {
-        board: [[Cell::Empty; Game::SIZE]; Game::SIZE],
+        board: [[Cell::Empty; Game::SIZE as usize]; Game::SIZE as usize],
         last_score: 0,
     }
 }
 
 pub struct Game {
-    board: [[Cell; Self::SIZE]; Self::SIZE],
+    board: [[Cell; Self::SIZE as usize]; Self::SIZE as usize],
     last_score: u8,
 }
 
 impl Game {
-    const SIZE: usize = 7;
+    pub const SIZE: u8 = 7;
 
     #[allow(clippy::cast_sign_loss)]
-    pub fn place(&self, token: Token, x: i8) -> Result<Self, Error> {
+    pub fn place(&self, token: Token, x: u8) -> Result<Self, Error> {
         let position = self.fall_position(x)?;
         Ok({
             let mut board = self.board;
@@ -42,7 +42,7 @@ impl Game {
         })
     }
 
-    pub fn _plan(&self, token: Token, x: i8) -> Result<u8, Error> {
+    pub fn plan(&self, token: Token, x: u8) -> Result<u8, Error> {
         let position = self.fall_position(x)?;
         Ok(self.score(token, &position))
     }
@@ -92,8 +92,8 @@ impl Game {
     fn cell(&self, position: &Position) -> Cell {
         if position.x < 0
             || position.y < 0
-            || position.x as usize >= Self::SIZE
-            || position.y as usize >= Self::SIZE
+            || position.x as u8 >= Self::SIZE
+            || position.y as u8 >= Self::SIZE
         {
             Cell::OutOfBounds
         } else {
@@ -105,13 +105,13 @@ impl Game {
         self.cell(&position) == Cell::Token(token)
     }
 
-    #[allow(clippy::cast_sign_loss)]
-    fn fall_position(&self, x: i8) -> Result<Position, Error> {
-        if x < 0 || x as usize >= Self::SIZE {
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_wrap)]
+    fn fall_position(&self, x: u8) -> Result<Position, Error> {
+        if x >= Self::SIZE {
             return Err(Error::OutOfBounds);
         }
 
-        let position = self.fall_position_height(Position { x, y: -1 });
+        let position = self.fall_position_height(Position { x: x as i8, y: -1 });
 
         if position.y < 0 {
             Err(Error::ColumnFull)
@@ -174,6 +174,15 @@ pub enum Token {
     Black,
 }
 
+impl Token {
+    pub fn flip(self) -> Self {
+        match self {
+            Self::White => Self::Black,
+            Self::Black => Self::White,
+        }
+    }
+}
+
 impl std::fmt::Display for Token {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -203,11 +212,10 @@ impl std::ops::Add<&Direction> for &Position {
 }
 
 impl Direction {
-    #[allow(clippy::neg_multiply)]
     fn reverse(&self) -> Self {
         Self {
-            x: self.x * -1,
-            y: self.y * -1,
+            x: -self.x,
+            y: -self.y,
         }
     }
 
