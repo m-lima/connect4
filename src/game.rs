@@ -16,70 +16,69 @@ impl std::fmt::Display for Error {
 pub fn new() -> Game {
     Game {
         board: [[Cell::Empty; Game::SIZE]; Game::SIZE],
+        last_score: 0,
     }
 }
 
 pub struct Game {
     board: [[Cell; Self::SIZE]; Self::SIZE],
+    last_score: u8,
 }
 
 impl Game {
     const SIZE: usize = 7;
 
     #[allow(clippy::cast_sign_loss)]
-    pub fn play(&self, player: Player, x: i8) -> Result<(Self, u8), Error> {
-        if x < 0 || x as usize >= Self::SIZE {
-            return Err(Error::OutOfBounds);
-        }
+    pub fn place(&self, token: Token, x: i8) -> Result<Self, Error> {
+        let position = self.fall_position(x)?;
+        Ok({
+            let mut board = self.board;
+            board[position.y as usize][position.x as usize] = Cell::Token(token);
 
-        let position = self.fall_position(x);
-        if position.y < 0 {
-            return Err(Error::ColumnFull);
-        }
-
-        let game = self.place(player, &position);
-        let score = game.score(player, &position);
-        Ok((game, score))
+            Self {
+                board,
+                last_score: self.score(token, &position),
+            }
+        })
     }
 
-    #[allow(clippy::cast_sign_loss)]
-    fn place(&self, player: Player, position: &Position) -> Self {
-        let mut board = self.board;
-        board[position.y as usize][position.x as usize] = Cell::Player(player);
-        Self { board }
+    pub fn plan(&self, token: Token, x: i8) -> Result<u8, Error> {
+        let position = self.fall_position(x)?;
+        Ok(self.score(token, &position))
     }
 
-    fn score(&self, player: Player, position: &Position) -> u8 {
+    pub fn last_score(&self) -> u8 {
+        self.last_score
+    }
+
+    fn score(&self, token: Token, position: &Position) -> u8 {
         std::cmp::max(
-            self.direction_score(player, position, &Direction::S),
+            self.direction_score(token, position, &Direction::S),
             std::cmp::max(
-                self.direction_score(player, position, &Direction::E),
+                self.direction_score(token, position, &Direction::E),
                 std::cmp::max(
-                    self.direction_score(player, position, &Direction::NE),
-                    self.direction_score(player, position, &Direction::SE),
+                    self.direction_score(token, position, &Direction::NE),
+                    self.direction_score(token, position, &Direction::SE),
                 ),
             ),
         )
     }
 
-    fn direction_score(&self, player: Player, position: &Position, direction: &Direction) -> u8 {
-        if self.is_player(player, &position) {
-            let reverse = direction.reverse();
-            1 + self.compound_direction_score(player, &(position + direction), &direction)
-                + self.compound_direction_score(player, &(position + &reverse), &reverse)
-        } else {
-            0
-        }
+    fn direction_score(&self, token: Token, position: &Position, direction: &Direction) -> u8 {
+        let reverse = &direction.reverse();
+        1 << (self.compound_direction_score(token, position + direction, direction)
+            + self.compound_direction_score(token, position + reverse, reverse))
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn compound_direction_score(
         &self,
-        player: Player,
-        position: &Position,
+        token: Token,
+        position: Position,
         direction: &Direction,
     ) -> u8 {
-        if self.is_player(player, position) {
-            self.compound_direction_score(player, &(position + direction), direction) + 1
+        if self.is_token(token, &position) {
+            self.compound_direction_score(token, &position + direction, direction) + 1
         } else {
             0
         }
@@ -98,12 +97,23 @@ impl Game {
         }
     }
 
-    fn is_player(&self, player: Player, position: &Position) -> bool {
-        self.cell(&position) == Cell::Player(player)
+    fn is_token(&self, token: Token, position: &Position) -> bool {
+        self.cell(&position) == Cell::Token(token)
     }
 
-    fn fall_position(&self, x: i8) -> Position {
-        self.fall_position_height(Position { x, y: -1 })
+    #[allow(clippy::cast_sign_loss)]
+    fn fall_position(&self, x: i8) -> Result<Position, Error> {
+        if x < 0 || x as usize >= Self::SIZE {
+            return Err(Error::OutOfBounds);
+        }
+
+        let position = self.fall_position_height(Position { x, y: -1 });
+
+        if position.y < 0 {
+            Err(Error::ColumnFull)
+        } else {
+            Ok(position)
+        }
     }
 
     fn fall_position_height(&self, position: Position) -> Position {
@@ -119,7 +129,7 @@ impl Game {
 impl std::fmt::Display for Game {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for row in &self.board {
-            for cell in row.iter() {
+            for cell in row {
                 write!(fmt, "|{}", cell)?;
             }
             writeln!(fmt, "|")?;
@@ -141,7 +151,7 @@ impl std::fmt::Display for Game {
 enum Cell {
     Empty,
     OutOfBounds,
-    Player(Player),
+    Token(Token),
 }
 
 impl std::fmt::Display for Cell {
@@ -149,18 +159,18 @@ impl std::fmt::Display for Cell {
         match self {
             Self::Empty => write!(fmt, "  "),
             Self::OutOfBounds => write!(fmt, ""),
-            Self::Player(p) => write!(fmt, "{}", p),
+            Self::Token(p) => write!(fmt, "{}", p),
         }
     }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum Player {
+pub enum Token {
     White,
     Black,
 }
 
-impl std::fmt::Display for Player {
+impl std::fmt::Display for Token {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::White => write!(fmt, "\u{2593}\u{2593}"),
@@ -215,66 +225,66 @@ mod tests {
         use super::super::*;
 
         #[test]
-        fn play() {
-            let game = new();
-            let (game, score) = game.play(Player::White, 3).unwrap();
-            assert_eq!(score, 1);
-            let (game, score) = game.play(Player::Black, 3).unwrap();
-            assert_eq!(score, 1);
-            let (game, score) = game.play(Player::White, 3).unwrap();
-            assert_eq!(score, 1);
-            let (game, score) = game.play(Player::Black, 0).unwrap();
-            assert_eq!(score, 1);
-            let (game, score) = game.play(Player::White, 1).unwrap();
-            assert_eq!(score, 1);
-            let (game, score) = game.play(Player::Black, 2).unwrap();
-            assert_eq!(score, 2);
-            let (_, score) = game.play(Player::White, 2).unwrap();
-            assert_eq!(score, 3);
+        fn place() {
+            let mut game = new();
+            game = game.place(Token::White, 3).unwrap();
+            assert_eq!(game.last_score, 1);
+            game = game.place(Token::Black, 3).unwrap();
+            assert_eq!(game.last_score, 1);
+            game = game.place(Token::White, 3).unwrap();
+            assert_eq!(game.last_score, 1);
+            game = game.place(Token::Black, 0).unwrap();
+            assert_eq!(game.last_score, 1);
+            game = game.place(Token::White, 1).unwrap();
+            assert_eq!(game.last_score, 1);
+            game = game.place(Token::Black, 2).unwrap();
+            assert_eq!(game.last_score, 2);
+            game.place(Token::White, 2).unwrap();
+            assert_eq!(game.last_score, 4);
         }
 
         #[test]
         fn play_errors() {
-            let game = new();
+            let mut game = new();
 
-            let (game, _) = game.play(Player::White, 3).unwrap();
-            let (game, _) = game.play(Player::White, 3).unwrap();
-            let (game, _) = game.play(Player::White, 3).unwrap();
-            let (game, _) = game.play(Player::White, 3).unwrap();
-            let (game, _) = game.play(Player::White, 3).unwrap();
-            let (game, _) = game.play(Player::White, 3).unwrap();
-            let (game, _) = game.play(Player::White, 3).unwrap();
+            game = game.place(Token::White, 3).unwrap();
+            game = game.place(Token::White, 3).unwrap();
+            game = game.place(Token::White, 3).unwrap();
+            game = game.place(Token::White, 3).unwrap();
+            game = game.place(Token::White, 3).unwrap();
+            game = game.place(Token::White, 3).unwrap();
+            game = game.place(Token::White, 3).unwrap();
 
             assert_eq!(
-                game.play(Player::Black, 3).err().unwrap(),
+                game.place(Token::Black, 3).err().unwrap(),
                 Error::ColumnFull
             );
             assert_eq!(
-                game.play(Player::Black, 9).err().unwrap(),
+                game.place(Token::Black, 9).err().unwrap(),
                 Error::OutOfBounds
             );
         }
 
         #[test]
-        fn count() {
+        fn score() {
             let mut game = new();
 
-            game.board[6][2] = Cell::Player(Player::Black);
-            game.board[5][2] = Cell::Player(Player::Black);
-            game.board[4][2] = Cell::Player(Player::Black);
-            game.board[3][2] = Cell::Player(Player::White);
+            game.board[6][2] = Cell::Token(Token::Black);
+            game.board[5][2] = Cell::Token(Token::Black);
+            game.board[4][2] = Cell::Token(Token::Black);
+            game.board[3][2] = Cell::Token(Token::White);
 
-            game.board[0][0] = Cell::Player(Player::White);
-            game.board[1][0] = Cell::Player(Player::White);
+            game.board[0][0] = Cell::Token(Token::White);
+            game.board[1][0] = Cell::Token(Token::White);
 
-            game.board[6][6] = Cell::Player(Player::Black);
-            game.board[5][5] = Cell::Player(Player::Black);
-            game.board[4][4] = Cell::Player(Player::Black);
-            game.board[4][5] = Cell::Player(Player::Black);
+            game.board[6][6] = Cell::Token(Token::Black);
+            game.board[5][5] = Cell::Token(Token::Black);
+            game.board[4][4] = Cell::Token(Token::Black);
+            game.board[4][5] = Cell::Token(Token::Black);
 
-            assert_eq!(game.score(Player::Black, &Position { x: 2, y: 5 }), 3);
-            assert_eq!(game.score(Player::White, &Position { x: 0, y: 1 }), 2);
-            assert_eq!(game.score(Player::Black, &Position { x: 5, y: 5 }), 3);
+            assert_eq!(game.score(Token::Black, &Position { x: 2, y: 5 }), 4);
+            assert_eq!(game.score(Token::White, &Position { x: 0, y: 1 }), 2);
+            assert_eq!(game.score(Token::Black, &Position { x: 5, y: 5 }), 4);
         }
 
         #[test]
@@ -287,25 +297,25 @@ mod tests {
         }
 
         #[test]
-        fn is_player() {
+        fn is_token() {
             let mut game = new();
-            game.board[3][2] = Cell::Player(Player::Black);
+            game.board[3][2] = Cell::Token(Token::Black);
 
-            assert!(!game.is_player(Player::Black, &Position { x: 8, y: 8 }));
-            assert!(!game.is_player(Player::Black, &Position { x: 0, y: 0 }));
-            assert!(!game.is_player(Player::White, &Position { x: 2, y: 3 }));
-            assert!(game.is_player(Player::Black, &Position { x: 2, y: 3 }));
+            assert!(!game.is_token(Token::Black, &Position { x: 8, y: 8 }));
+            assert!(!game.is_token(Token::Black, &Position { x: 0, y: 0 }));
+            assert!(!game.is_token(Token::White, &Position { x: 2, y: 3 }));
+            assert!(game.is_token(Token::Black, &Position { x: 2, y: 3 }));
         }
 
         #[test]
         fn fall_position() {
             let mut game = new();
-            game.board[3][2] = Cell::Player(Player::Black);
-            game.board[6][4] = Cell::Player(Player::White);
+            game.board[3][2] = Cell::Token(Token::Black);
+            game.board[6][4] = Cell::Token(Token::White);
 
-            assert_eq!(game.fall_position(0), Position { x: 0, y: 6 });
-            assert_eq!(game.fall_position(2), Position { x: 2, y: 2 });
-            assert_eq!(game.fall_position(4), Position { x: 4, y: 5 });
+            assert_eq!(game.fall_position(0).unwrap(), Position { x: 0, y: 6 });
+            assert_eq!(game.fall_position(2).unwrap(), Position { x: 2, y: 2 });
+            assert_eq!(game.fall_position(4).unwrap(), Position { x: 4, y: 5 });
         }
     }
 
@@ -314,9 +324,9 @@ mod tests {
 
         #[test]
         fn translation() {
-            let position = Position { x: 2, y: 3 };
-            let direction = Direction { x: -9, y: 1 };
-            assert_eq!(&position + &direction, Position { x: -7, y: 4 });
+            let position = &Position { x: 2, y: 3 };
+            let direction = &Direction { x: -9, y: 1 };
+            assert_eq!(position + direction, Position { x: -7, y: 4 });
         }
 
         #[test]
