@@ -80,12 +80,26 @@ impl Ai {
         columns
     }
 
-    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    #[allow(
+        clippy::cast_sign_loss,
+        clippy::cast_possible_truncation,
+        clippy::filter_map
+    )]
     fn best_move(&self, game: &super::game::Game) -> u8 {
         let columns = Self::shuffle_columns();
         columns
             .into_iter()
-            .map(|x| (x, Self::dig(game, 0, self.token, 1)))
+            .map(|x| (x, game.place(self.token, x)))
+            .filter(|r| r.1.is_ok())
+            .map(|r| {
+                let g = r.1.unwrap();
+                let score = i32::from(g.last_score() * Self::DEPTH);
+                (r.0, score + Self::dig(&g, 1, self.token.flip(), -1))
+            })
+            .map(|r| {
+                println!("Score for {}: {}", r.0 + 1, r.1);
+                r
+            })
             .fold(
                 (0, i32::min_value()),
                 |acc, s| {
@@ -101,13 +115,14 @@ impl Ai {
 
     #[allow(clippy::filter_map)]
     fn dig(game: &super::game::Game, depth: u8, token: super::game::Token, factor: i32) -> i32 {
-        if depth == Self::DEPTH - 1 {
-            let score: i32 = (0..super::game::Game::SIZE)
+        if depth >= Self::DEPTH - 1 {
+            (0..super::game::Game::SIZE)
                 .map(|x| game.plan(token, x))
                 .filter_map(std::result::Result::ok)
                 .map(|s| i32::from(s * Self::DEPTH - depth))
-                .sum();
-            score * factor
+                .max()
+                .unwrap_or(0)
+                * factor
         } else {
             (0..super::game::Game::SIZE)
                 .map(|x| game.place(token, x))
@@ -116,7 +131,8 @@ impl Ai {
                     let score = factor * i32::from(g.last_score() * Self::DEPTH - depth);
                     score + Self::dig(&g, depth + 1, token.flip(), -factor)
                 })
-                .sum()
+                .max()
+                .unwrap_or(0)
         }
     }
 }
