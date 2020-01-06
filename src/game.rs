@@ -117,9 +117,9 @@ impl Game {
         }
     }
 
-    #[allow(clippy::cast_sign_loss, clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_possible_wrap)]
     fn fall_position(&self, x: u8) -> Result<Position, Error> {
-        if x >= Board::SIZE {
+        if x >= Board::size() {
             return Err(Error::OutOfBounds);
         }
 
@@ -151,12 +151,12 @@ impl std::fmt::Display for Game {
             writeln!(fmt, "|")?;
         }
 
-        for _ in 0..Board::SIZE {
+        for _ in 0..Board::size() {
             write!(fmt, "---")?;
         }
         writeln!(fmt, "-")?;
 
-        for i in 0..Board::SIZE {
+        for i in 0..Board::size() {
             write!(fmt, " {:2}", i + 1)?;
         }
         writeln!(fmt)
@@ -164,16 +164,13 @@ impl std::fmt::Display for Game {
 }
 
 pub struct Board {
-    cells: [[Cell; Self::SIZE as usize]; Self::SIZE as usize],
+    cells: [[Cell; Self::usize()]; Self::usize()],
 }
 
 impl Board {
-    // TODO: Make dynamic
-    pub const SIZE: u8 = 7;
-
     fn new() -> Self {
         Self {
-            cells: [[Cell::Empty; Self::SIZE as usize]; Self::SIZE as usize],
+            cells: [[Cell::Empty; Self::usize()]; Self::usize()],
         }
     }
 
@@ -181,8 +178,8 @@ impl Board {
     fn cell(&self, position: &Position) -> Cell {
         if position.x < 0
             || position.y < 0
-            || position.x as u8 >= Self::SIZE
-            || position.y as u8 >= Self::SIZE
+            || position.x as u8 >= Self::size()
+            || position.y as u8 >= Self::size()
         {
             Cell::OutOfBounds
         } else {
@@ -192,6 +189,15 @@ impl Board {
 
     fn is_token(&self, token: Token, position: &Position) -> bool {
         self.cell(&position) == Cell::Token(token)
+    }
+
+    const fn usize() -> usize {
+        7
+    }
+
+    // TODO: Make dynamic
+    pub const fn size() -> u8 {
+        7
     }
 }
 

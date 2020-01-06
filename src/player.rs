@@ -77,16 +77,12 @@ impl Ai {
     fn shuffle_columns() -> Vec<u8> {
         use rand::seq::SliceRandom;
         let mut rng = rand::thread_rng();
-        let mut columns = (0..super::game::Board::SIZE).collect::<Vec<u8>>();
+        let mut columns = (0..super::game::Board::size()).collect::<Vec<u8>>();
         columns.shuffle(&mut rng);
         columns
     }
 
-    #[allow(
-        clippy::cast_sign_loss,
-        clippy::cast_possible_truncation,
-        clippy::filter_map
-    )]
+    #[allow(clippy::filter_map)]
     fn best_move(&self, game: &super::game::Game) -> u8 {
         let columns = Self::shuffle_columns();
         columns
@@ -95,7 +91,7 @@ impl Ai {
             .filter(|r| r.1.is_ok())
             .map(|r| {
                 let g = r.1.unwrap();
-                if let super::game::Status::Victory = g.status() {
+                if super::game::Status::Victory == g.status() {
                     (r.0, 7_i64.pow(u32::from(Self::DEPTH)))
                 } else if Self::DEPTH > 0 {
                     (r.0, Self::dig(&g, Self::DEPTH - 1, self.token.flip(), -1))
@@ -123,11 +119,11 @@ impl Ai {
     #[allow(clippy::filter_map)]
     fn dig(game: &super::game::Game, depth: u8, token: super::game::Token, factor: i64) -> i64 {
         if depth > 0 {
-            (0..super::game::Board::SIZE)
+            (0..super::game::Board::size())
                 .map(|x| game.place(token, x))
                 .filter_map(std::result::Result::ok)
                 .map(|g| {
-                    if let super::game::Status::Victory = g.status() {
+                    if super::game::Status::Victory == g.status() {
                         factor * 7_i64.pow(u32::from(depth))
                     } else {
                         Self::dig(&g, depth - 1, token.flip(), -factor)
@@ -135,7 +131,7 @@ impl Ai {
                 })
                 .sum::<i64>()
         } else {
-            (0..super::game::Board::SIZE)
+            (0..super::game::Board::size())
                 .map(|x| game.plan(token, x))
                 .filter_map(std::result::Result::ok)
                 .map(|s| {
