@@ -69,13 +69,15 @@ pub fn new_ai(token: super::game::Token) -> Ai {
     Ai { token }
 }
 
+// TODO: Add tests
 impl Ai {
+    // TODO: Make dynamic
     const DEPTH: u8 = 7;
 
     fn shuffle_columns() -> Vec<u8> {
         use rand::seq::SliceRandom;
         let mut rng = rand::thread_rng();
-        let mut columns = (0..super::game::Game::SIZE).collect::<Vec<u8>>();
+        let mut columns = (0..super::game::Board::SIZE).collect::<Vec<u8>>();
         columns.shuffle(&mut rng);
         columns
     }
@@ -93,20 +95,18 @@ impl Ai {
             .filter(|r| r.1.is_ok())
             .map(|r| {
                 let g = r.1.unwrap();
-//                let score = i32::from(g.last_score());
-//                (r.0, score + Self::dig(&g, Self::DEPTH, self.token.flip(), -1))
-                if g.last_score() == 1 {
-                    ( r.0, 7_i64.pow(Self::DEPTH as u32))
+                if let super::game::Status::Victory = g.status() {
+                    (r.0, 7_i64.pow(u32::from(Self::DEPTH)))
                 } else if Self::DEPTH > 0 {
-                    ( r.0, Self::dig(&g, Self::DEPTH - 1, self.token.flip(), -1) )
+                    (r.0, Self::dig(&g, Self::DEPTH - 1, self.token.flip(), -1))
                 } else {
-                    ( r.0, 0_i64)
+                    (r.0, 0_i64)
                 }
             })
-//            .map(|r| {
-//                println!("Score for {}: {}", r.0 + 1, r.1);
-//                r
-//            })
+            //            .map(|r| {
+            //                println!("Score for {}: {}", r.0 + 1, r.1);
+            //                r
+            //            })
             .fold(
                 (0, i64::min_value()),
                 |acc, s| {
@@ -122,30 +122,33 @@ impl Ai {
 
     #[allow(clippy::filter_map)]
     fn dig(game: &super::game::Game, depth: u8, token: super::game::Token, factor: i64) -> i64 {
-        let score = if depth > 0 {
-            (0..super::game::Game::SIZE)
+        if depth > 0 {
+            (0..super::game::Board::SIZE)
                 .map(|x| game.place(token, x))
                 .filter_map(std::result::Result::ok)
                 .map(|g| {
-//                    let score = factor * i32::from(g.last_score());
-//                    score + Self::dig(&g, depth - 1, token.flip(), -factor)
-                    if g.last_score() == 1 {
-                        factor * 7_i64.pow(depth as u32)
+                    if let super::game::Status::Victory = g.status() {
+                        factor * 7_i64.pow(u32::from(depth))
                     } else {
                         Self::dig(&g, depth - 1, token.flip(), -factor)
                     }
                 })
                 .sum::<i64>()
         } else {
-            (0..super::game::Game::SIZE)
+            (0..super::game::Board::SIZE)
                 .map(|x| game.plan(token, x))
                 .filter_map(std::result::Result::ok)
-                .map(i64::from)
+                .map(|s| {
+                    if let super::game::Status::Victory = s {
+                        1
+                    } else {
+                        0
+                    }
+                })
                 .sum::<i64>()
-                * factor * depth as i64
-        };
-//        println!("{: >3$}{}: {}", "Score for depth", depth, score, depth as usize);
-        score
+                * factor
+                * i64::from(depth)
+        }
     }
 }
 

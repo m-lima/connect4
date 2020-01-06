@@ -19,7 +19,7 @@ fn usage() {
 fn clear() {}
 
 fn print(game: &game::Game, error: &Option<String>) {
-//    print!("\x1b[2J");
+    //    print!("\x1b[2J");
 
     if let Some(message) = error {
         println!("Error: {}", message);
@@ -29,6 +29,7 @@ fn print(game: &game::Game, error: &Option<String>) {
 }
 
 fn main() {
+    // TODO: Configure players, size, and depth
     let mut game = game::new();
 
     let mut turn = false;
@@ -57,16 +58,16 @@ fn main() {
                 Ok(new_state) => {
                     game = new_state;
                     match game.status() {
-                        game::Status::Won => {
+                        game::Status::Victory => {
                             print(&game, &None);
                             println!("Player {} won by playing {}", player.token(), input + 1);
                             break;
-                        },
+                        }
                         game::Status::Tie => {
                             print(&game, &None);
                             println!("It's a draw...");
                             break;
-                        },
+                        }
                         _ => {}
                     }
                     turn = !turn;

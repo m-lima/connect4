@@ -13,112 +13,113 @@ impl std::fmt::Display for Error {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Status {
-    Won,
+    Victory,
     Tie,
     Ongoing,
 }
 
+trait Playable {
+    type Output;
+    fn place(&self, token: Token, x: u8) -> Result<Self::Output, Error>;
+    fn plan(&self, token: Token, x: u8) -> Result<Self::Output, Error>;
+    fn status(&self) -> Status;
+    fn size(&self) -> u8;
+}
+
+trait Placeable {}
+
 pub fn new() -> Game {
     Game {
-        board: [[Cell::Empty; Game::SIZE as usize]; Game::SIZE as usize],
-        last_score: 0,
+        board: Board::new(),
+        status: Status::Ongoing,
     }
 }
 
 pub struct Game {
-    board: [[Cell; Self::SIZE as usize]; Self::SIZE as usize],
-    last_score: u8,
+    board: Board,
+    status: Status,
 }
 
-impl Game {
-    pub const SIZE: u8 = 7;
+//impl Playable for Game {
+//
+//}
 
+// TODO: Make trait for tests
+impl Game {
     #[allow(clippy::cast_sign_loss)]
     pub fn place(&self, token: Token, x: u8) -> Result<Self, Error> {
         let position = self.fall_position(x)?;
         Ok({
-            let mut board = self.board;
-            board[position.y as usize][position.x as usize] = Cell::Token(token);
+            let mut cells = self.board.cells;
+            cells[position.y as usize][position.x as usize] = Cell::Token(token);
+            let board = Board { cells };
+            let status = Self::build_status(token, &position, &board);
 
-            Self {
-                board,
-                last_score: self.score(token, &position),
-            }
+            Self { board, status }
         })
     }
 
-    pub fn plan(&self, token: Token, x: u8) -> Result<u8, Error> {
+    pub fn plan(&self, token: Token, x: u8) -> Result<Status, Error> {
         let position = self.fall_position(x)?;
-        Ok(self.score(token, &position))
+        Ok(Self::build_status(token, &position, &self.board))
     }
 
     pub fn status(&self) -> Status {
-        if self.last_score == 1 {
-            Status::Won
-        } else if !self.board[0].iter().any(|c| *c == Cell::Empty) {
+        self.status
+    }
+
+    fn build_status(token: Token, position: &Position, board: &Board) -> Status {
+        if Self::tie(&position, &board) {
             Status::Tie
+        } else if Self::victory(token, &position, &board) {
+            Status::Victory
         } else {
             Status::Ongoing
         }
     }
 
-    pub fn last_score(&self) -> u8 {
-        self.last_score
+    fn tie(position: &Position, board: &Board) -> bool {
+        position.y == 0 && !board.cells[0].iter().any(|c| *c == Cell::Empty)
     }
 
-    fn score(&self, token: Token, position: &Position) -> u8 {
-        *([
-            self.direction_score(token, position, &Direction::S),
-            self.direction_score(token, position, &Direction::E),
-            self.direction_score(token, position, &Direction::NE),
-            self.direction_score(token, position, &Direction::SE),
-        ]
-        .iter()
-        .max()
-        .unwrap_or(&0)) >> 3
+    fn victory(token: Token, position: &Position, board: &Board) -> bool {
+        Self::direction_score(token, position, &board, &Direction::S)
+            || Self::direction_score(token, position, &board, &Direction::E)
+            || Self::direction_score(token, position, &board, &Direction::NE)
+            || Self::direction_score(token, position, &board, &Direction::SE)
     }
 
-    fn direction_score(&self, token: Token, position: &Position, direction: &Direction) -> u8 {
+    fn direction_score(
+        token: Token,
+        position: &Position,
+        board: &Board,
+        direction: &Direction,
+    ) -> bool {
         let reverse = &direction.reverse();
-        1 << (self.compound_direction_score(token, position + direction, direction)
-            + self.compound_direction_score(token, position + reverse, reverse))
+        (Self::compound_direction_score(token, position + direction, &board, direction)
+            + Self::compound_direction_score(token, position + reverse, &board, reverse))
+            >= 3
     }
 
     #[allow(clippy::needless_pass_by_value)]
     fn compound_direction_score(
-        &self,
         token: Token,
         position: Position,
+        board: &Board,
         direction: &Direction,
     ) -> u8 {
-        if self.is_token(token, &position) {
-            self.compound_direction_score(token, &position + direction, direction) + 1
+        if board.is_token(token, &position) {
+            Self::compound_direction_score(token, &position + direction, &board, direction) + 1
         } else {
             0
         }
     }
 
-    #[allow(clippy::cast_sign_loss)]
-    fn cell(&self, position: &Position) -> Cell {
-        if position.x < 0
-            || position.y < 0
-            || position.x as u8 >= Self::SIZE
-            || position.y as u8 >= Self::SIZE
-        {
-            Cell::OutOfBounds
-        } else {
-            self.board[position.y as usize][position.x as usize]
-        }
-    }
-
-    fn is_token(&self, token: Token, position: &Position) -> bool {
-        self.cell(&position) == Cell::Token(token)
-    }
-
     #[allow(clippy::cast_sign_loss, clippy::cast_possible_wrap)]
     fn fall_position(&self, x: u8) -> Result<Position, Error> {
-        if x >= Self::SIZE {
+        if x >= Board::SIZE {
             return Err(Error::OutOfBounds);
         }
 
@@ -133,7 +134,7 @@ impl Game {
 
     fn fall_position_height(&self, position: Position) -> Position {
         let floor = &position + &Direction::S;
-        if Cell::Empty == self.cell(&floor) {
+        if Cell::Empty == self.board.cell(&floor) {
             self.fall_position_height(floor)
         } else {
             position
@@ -143,22 +144,54 @@ impl Game {
 
 impl std::fmt::Display for Game {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for row in &self.board {
+        for row in &self.board.cells {
             for cell in row {
                 write!(fmt, "|{}", cell)?;
             }
             writeln!(fmt, "|")?;
         }
 
-        for _ in 0..Self::SIZE {
+        for _ in 0..Board::SIZE {
             write!(fmt, "---")?;
         }
         writeln!(fmt, "-")?;
 
-        for i in 0..Self::SIZE {
+        for i in 0..Board::SIZE {
             write!(fmt, " {:2}", i + 1)?;
         }
         writeln!(fmt)
+    }
+}
+
+pub struct Board {
+    cells: [[Cell; Self::SIZE as usize]; Self::SIZE as usize],
+}
+
+impl Board {
+    // TODO: Make dynamic
+    pub const SIZE: u8 = 7;
+
+    fn new() -> Self {
+        Self {
+            cells: [[Cell::Empty; Self::SIZE as usize]; Self::SIZE as usize],
+        }
+    }
+
+    #[allow(clippy::cast_sign_loss)]
+    fn cell(&self, position: &Position) -> Cell {
+        if position.x < 0
+            || position.y < 0
+            || position.x as u8 >= Self::SIZE
+            || position.y as u8 >= Self::SIZE
+        {
+            Cell::OutOfBounds
+        } else {
+            self.cells[position.y as usize][position.x as usize]
+        }
+    }
+
+    fn is_token(&self, token: Token, position: &Position) -> bool {
+        self.cell(&position) == Cell::Token(token)
     }
 }
 
@@ -199,7 +232,6 @@ impl std::fmt::Display for Token {
         match self {
             Self::White => write!(fmt, "\u{2593}\u{2593}"),
             Self::Black => write!(fmt, "\u{2591}\u{2591}"),
-            // "█"
         }
     }
 }
@@ -250,24 +282,32 @@ mod tests {
         #[test]
         fn place() {
             let mut game = new();
-            game = game.place(Token::White, 3).unwrap();
-            assert_eq!(game.last_score, 1);
-            game = game.place(Token::Black, 3).unwrap();
-            assert_eq!(game.last_score, 1);
-            game = game.place(Token::White, 3).unwrap();
-            assert_eq!(game.last_score, 1);
-            game = game.place(Token::Black, 0).unwrap();
-            assert_eq!(game.last_score, 1);
-            game = game.place(Token::White, 1).unwrap();
-            assert_eq!(game.last_score, 1);
-            game = game.place(Token::Black, 2).unwrap();
-            assert_eq!(game.last_score, 2);
+            game = game.place(Token::Black, 1).unwrap();
+            assert_eq!(game.status(), Status::Ongoing);
             game = game.place(Token::White, 2).unwrap();
-            assert_eq!(game.last_score, 4);
+            assert_eq!(game.status(), Status::Ongoing);
+            game = game.place(Token::Black, 3).unwrap();
+            assert_eq!(game.status(), Status::Ongoing);
+            game = game.place(Token::White, 3).unwrap();
+            assert_eq!(game.status(), Status::Ongoing);
+            game = game.place(Token::Black, 3).unwrap();
+            assert_eq!(game.status(), Status::Ongoing);
+            game = game.place(Token::White, 3).unwrap();
+            assert_eq!(game.status(), Status::Ongoing);
+            game = game.place(Token::Black, 4).unwrap();
+            assert_eq!(game.status(), Status::Ongoing);
+            game = game.place(Token::White, 1).unwrap();
+            assert_eq!(game.status(), Status::Ongoing);
+            game = game.place(Token::Black, 2).unwrap();
+            assert_eq!(game.status(), Status::Ongoing);
+            game = game.place(Token::White, 2).unwrap();
+            assert_eq!(game.status(), Status::Ongoing);
+            game = game.place(Token::White, 0).unwrap();
+            assert_eq!(game.status(), Status::Victory);
         }
 
         #[test]
-        fn play_errors() {
+        fn place_errors() {
             let mut game = new();
 
             game = game.place(Token::White, 3).unwrap();
@@ -289,56 +329,79 @@ mod tests {
         }
 
         #[test]
-        fn score() {
+        fn victory() {
             let mut game = new();
 
-            game.board[6][2] = Cell::Token(Token::Black);
-            game.board[5][2] = Cell::Token(Token::Black);
-            game.board[4][2] = Cell::Token(Token::Black);
-            game.board[3][2] = Cell::Token(Token::White);
+            game.board.cells[6][2] = Cell::Token(Token::Black);
+            game.board.cells[5][2] = Cell::Token(Token::Black);
+            game.board.cells[4][2] = Cell::Token(Token::Black);
+            game.board.cells[3][2] = Cell::Token(Token::White);
 
-            game.board[0][0] = Cell::Token(Token::White);
-            game.board[1][0] = Cell::Token(Token::White);
+            game.board.cells[0][0] = Cell::Token(Token::White);
+            game.board.cells[1][0] = Cell::Token(Token::White);
 
-            game.board[6][6] = Cell::Token(Token::Black);
-            game.board[5][5] = Cell::Token(Token::Black);
-            game.board[4][4] = Cell::Token(Token::Black);
-            game.board[4][5] = Cell::Token(Token::Black);
+            game.board.cells[6][6] = Cell::Token(Token::Black);
+            game.board.cells[5][5] = Cell::Token(Token::Black);
+            game.board.cells[4][4] = Cell::Token(Token::Black);
+            game.board.cells[4][5] = Cell::Token(Token::Black);
 
-            assert_eq!(game.score(Token::Black, &Position { x: 2, y: 5 }), 4);
-            assert_eq!(game.score(Token::White, &Position { x: 0, y: 1 }), 2);
-            assert_eq!(game.score(Token::Black, &Position { x: 5, y: 5 }), 4);
-        }
+            assert_eq!(
+                Game::victory(Token::Black, &Position { x: 2, y: 5 }, &game.board),
+                false
+            );
+            assert_eq!(
+                Game::victory(Token::White, &Position { x: 0, y: 1 }, &game.board),
+                false
+            );
+            assert_eq!(
+                Game::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
+                false
+            );
 
-        #[test]
-        fn out_of_bounds() {
-            let game = new();
-            assert_eq!(game.cell(&Position { x: 8, y: 1 }), Cell::OutOfBounds);
-            assert_eq!(game.cell(&Position { x: 1, y: 8 }), Cell::OutOfBounds);
-            assert_eq!(game.cell(&Position { x: 8, y: 8 }), Cell::OutOfBounds);
-            assert_ne!(game.cell(&Position { x: 1, y: 1 }), Cell::OutOfBounds);
-        }
-
-        #[test]
-        fn is_token() {
-            let mut game = new();
-            game.board[3][2] = Cell::Token(Token::Black);
-
-            assert!(!game.is_token(Token::Black, &Position { x: 8, y: 8 }));
-            assert!(!game.is_token(Token::Black, &Position { x: 0, y: 0 }));
-            assert!(!game.is_token(Token::White, &Position { x: 2, y: 3 }));
-            assert!(game.is_token(Token::Black, &Position { x: 2, y: 3 }));
+            game.board.cells[3][3] = Cell::Token(Token::Black);
+            assert_eq!(
+                Game::victory(Token::White, &Position { x: 5, y: 5 }, &game.board),
+                false
+            );
+            assert_eq!(
+                Game::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
+                true
+            );
         }
 
         #[test]
         fn fall_position() {
             let mut game = new();
-            game.board[3][2] = Cell::Token(Token::Black);
-            game.board[6][4] = Cell::Token(Token::White);
+            game.board.cells[3][2] = Cell::Token(Token::Black);
+            game.board.cells[6][4] = Cell::Token(Token::White);
 
             assert_eq!(game.fall_position(0).unwrap(), Position { x: 0, y: 6 });
             assert_eq!(game.fall_position(2).unwrap(), Position { x: 2, y: 2 });
             assert_eq!(game.fall_position(4).unwrap(), Position { x: 4, y: 5 });
+        }
+    }
+
+    mod board {
+        use super::super::*;
+
+        #[test]
+        fn out_of_bounds() {
+            let board = Board::new();
+            assert_eq!(board.cell(&Position { x: 8, y: 1 }), Cell::OutOfBounds);
+            assert_eq!(board.cell(&Position { x: 1, y: 8 }), Cell::OutOfBounds);
+            assert_eq!(board.cell(&Position { x: 8, y: 8 }), Cell::OutOfBounds);
+            assert_ne!(board.cell(&Position { x: 1, y: 1 }), Cell::OutOfBounds);
+        }
+
+        #[test]
+        fn is_token() {
+            let mut board = Board::new();
+            board.cells[3][2] = Cell::Token(Token::Black);
+
+            assert!(!board.is_token(Token::Black, &Position { x: 8, y: 8 }));
+            assert!(!board.is_token(Token::Black, &Position { x: 0, y: 0 }));
+            assert!(!board.is_token(Token::White, &Position { x: 2, y: 3 }));
+            assert!(board.is_token(Token::Black, &Position { x: 2, y: 3 }));
         }
     }
 
