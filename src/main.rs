@@ -19,7 +19,7 @@ fn usage() {
 fn clear() {}
 
 fn print(game: &game::Game, error: &Option<String>) {
-    print!("\x1b[2J");
+//    print!("\x1b[2J");
 
     if let Some(message) = error {
         println!("Error: {}", message);

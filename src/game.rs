@@ -54,7 +54,7 @@ impl Game {
     }
 
     pub fn status(&self) -> Status {
-        if self.last_score >= 1 << 3 {
+        if self.last_score == 1 {
             Status::Won
         } else if !self.board[0].iter().any(|c| *c == Cell::Empty) {
             Status::Tie
@@ -76,7 +76,7 @@ impl Game {
         ]
         .iter()
         .max()
-        .unwrap_or(&0)
+        .unwrap_or(&0) >> 3
     }
 
     fn direction_score(&self, token: Token, position: &Position, direction: &Direction) -> u8 {

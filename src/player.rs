@@ -70,7 +70,7 @@ pub fn new_ai(token: super::game::Token) -> Ai {
 }
 
 impl Ai {
-    const DEPTH: u8 = 10;
+    const DEPTH: u8 = 2;
 
     fn shuffle_columns() -> Vec<u8> {
         use rand::seq::SliceRandom;
@@ -93,8 +93,17 @@ impl Ai {
             .filter(|r| r.1.is_ok())
             .map(|r| {
                 let g = r.1.unwrap();
-                let score = i32::from(g.last_score());
-                (r.0, score + Self::dig(&g, 1, self.token.flip(), -1))
+//                let score = i32::from(g.last_score());
+//                (r.0, score + Self::dig(&g, Self::DEPTH, self.token.flip(), -1))
+                if g.last_score() == 1 {
+                    ( r.0, Self::DEPTH as i32)
+                } else {
+                    ( r.0, Self::dig(&g, Self::DEPTH, self.token.flip(), -1) )
+                }
+            })
+            .map(|r| {
+                println!("Score for {}: {}", r.0 + 1, r.1);
+                r
             })
             .fold(
                 (0, i32::min_value()),
@@ -111,25 +120,30 @@ impl Ai {
 
     #[allow(clippy::filter_map)]
     fn dig(game: &super::game::Game, depth: u8, token: super::game::Token, factor: i32) -> i32 {
-        if depth >= Self::DEPTH - 1 {
+        let score = if depth > 1 {
             (0..super::game::Game::SIZE)
                 .map(|x| game.place(token, x))
                 .filter_map(std::result::Result::ok)
                 .map(|g| {
-                    let score = factor * i32::from(g.last_score());
-                    score + Self::dig(&g, depth - 1, token.flip(), -factor)
+//                    let score = factor * i32::from(g.last_score());
+//                    score + Self::dig(&g, depth - 1, token.flip(), -factor)
+                    if g.last_score() == 1 {
+                        factor * depth as i32
+                    } else {
+                        Self::dig(&g, depth - 1, token.flip(), -factor)
+                    }
                 })
-                .max()
-                .unwrap_or(0)
+                .sum::<i32>()
         } else {
             (0..super::game::Game::SIZE)
                 .map(|x| game.plan(token, x))
                 .filter_map(std::result::Result::ok)
                 .map(i32::from)
-                .max()
-                .unwrap_or(0)
-                * factor
-        }
+                .sum::<i32>()
+                * factor * depth as i32
+        };
+        println!("{: >3$}{}: {}", "Score for depth", depth, score, depth as usize);
+        score
     }
 }
 
