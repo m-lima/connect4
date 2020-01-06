@@ -70,7 +70,7 @@ pub fn new_ai(token: super::game::Token) -> Ai {
 }
 
 impl Ai {
-    const DEPTH: u8 = 2;
+    const DEPTH: u8 = 6;
 
     fn shuffle_columns() -> Vec<u8> {
         use rand::seq::SliceRandom;
@@ -96,7 +96,7 @@ impl Ai {
 //                let score = i32::from(g.last_score());
 //                (r.0, score + Self::dig(&g, Self::DEPTH, self.token.flip(), -1))
                 if g.last_score() == 1 {
-                    ( r.0, Self::DEPTH as i32)
+                    ( r.0, 7_i32.pow(Self::DEPTH as u32))
                 } else {
                     ( r.0, Self::dig(&g, Self::DEPTH, self.token.flip(), -1) )
                 }
@@ -128,7 +128,7 @@ impl Ai {
 //                    let score = factor * i32::from(g.last_score());
 //                    score + Self::dig(&g, depth - 1, token.flip(), -factor)
                     if g.last_score() == 1 {
-                        factor * depth as i32
+                        factor * 7_i32.pow(depth as u32) as i32
                     } else {
                         Self::dig(&g, depth - 1, token.flip(), -factor)
                     }
@@ -142,7 +142,7 @@ impl Ai {
                 .sum::<i32>()
                 * factor * depth as i32
         };
-        println!("{: >3$}{}: {}", "Score for depth", depth, score, depth as usize);
+//        println!("{: >3$}{}: {}", "Score for depth", depth, score, depth as usize);
         score
     }
 }

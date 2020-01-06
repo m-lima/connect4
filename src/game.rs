@@ -68,7 +68,7 @@ impl Game {
     }
 
     fn score(&self, token: Token, position: &Position) -> u8 {
-        *[
+        *([
             self.direction_score(token, position, &Direction::S),
             self.direction_score(token, position, &Direction::E),
             self.direction_score(token, position, &Direction::NE),
@@ -76,7 +76,7 @@ impl Game {
         ]
         .iter()
         .max()
-        .unwrap_or(&0) >> 3
+        .unwrap_or(&0)) >> 3
     }
 
     fn direction_score(&self, token: Token, position: &Position, direction: &Direction) -> u8 {
