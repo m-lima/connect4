@@ -20,16 +20,6 @@ pub enum Status {
     Ongoing,
 }
 
-trait Playable {
-    type Output;
-    fn place(&self, token: Token, x: u8) -> Result<Self::Output, Error>;
-    fn plan(&self, token: Token, x: u8) -> Result<Self::Output, Error>;
-    fn status(&self) -> Status;
-    fn size(&self) -> u8;
-}
-
-trait Placeable {}
-
 pub fn new() -> Game {
     Game {
         board: Board::new(),
@@ -41,10 +31,6 @@ pub struct Game {
     board: Board,
     status: Status,
 }
-
-//impl Playable for Game {
-//
-//}
 
 // TODO: Make trait for tests
 impl Game {

@@ -34,7 +34,7 @@ fn main() {
 
     let mut turn = false;
     let white = player::new_human(game::Token::White);
-    let black = player::new_ai(game::Token::Black);
+    let black = player::new_ai(game::Token::Black, 7);
 
     let mut error: Option<String> = None;
 

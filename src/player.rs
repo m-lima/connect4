@@ -63,17 +63,15 @@ impl Player for Human {
 
 pub struct Ai {
     token: super::game::Token,
+    depth: u8,
 }
 
-pub fn new_ai(token: super::game::Token) -> Ai {
-    Ai { token }
+pub fn new_ai(token: super::game::Token, depth: u8) -> Ai {
+    Ai { token, depth }
 }
 
 // TODO: Add tests
 impl Ai {
-    // TODO: Make dynamic
-    const DEPTH: u8 = 7;
-
     fn shuffle_columns() -> Vec<u8> {
         use rand::seq::SliceRandom;
         let mut rng = rand::thread_rng();
@@ -92,9 +90,9 @@ impl Ai {
             .map(|r| {
                 let g = r.1.unwrap();
                 if super::game::Status::Victory == g.status() {
-                    (r.0, 7_i64.pow(u32::from(Self::DEPTH)))
-                } else if Self::DEPTH > 0 {
-                    (r.0, Self::dig(&g, Self::DEPTH - 1, self.token.flip(), -1))
+                    (r.0, 7_i64.pow(u32::from(self.depth)))
+                } else if self.depth > 0 {
+                    (r.0, Self::dig(&g, self.depth - 1, self.token.flip(), -1))
                 } else {
                     (r.0, 0_i64)
                 }
@@ -150,7 +148,7 @@ impl Ai {
 
 impl Player for Ai {
     fn play(&self, game: &super::game::Game) -> Result {
-        Result::Ok(self.best_move(&game))
+        Result::Ok(self.best_move(game))
     }
 
     fn token(&self) -> super::game::Token {
