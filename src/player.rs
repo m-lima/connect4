@@ -80,6 +80,7 @@ impl Ai {
         columns
     }
 
+    // TODO: Parallelize
     #[allow(clippy::filter_map)]
     fn best_move(&self, game: &super::game::Game) -> u8 {
         let columns = Self::shuffle_columns();
