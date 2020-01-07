@@ -122,7 +122,7 @@ impl Ai {
                     let col = play.col;
                     Some(AiResult::Threaded(std::thread::spawn(move || Play {
                         col,
-                        value: Self::dig(&game, depth - 1, token.flip(), -1),
+                        value: Self::dig(&game, depth - 1, !token, -1),
                     })))
                 } else {
                     None
@@ -174,7 +174,7 @@ impl Ai {
                     if super::game::Status::Victory == game.status() {
                         factor * 7_i64.pow(u32::from(depth))
                     } else {
-                        Self::dig(&game, depth - 1, token.flip(), -factor)
+                        Self::dig(&game, depth - 1, !token, -factor)
                     }
                 })
                 .sum::<i64>()

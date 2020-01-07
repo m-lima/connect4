@@ -26,11 +26,23 @@ pub enum Token {
     Black,
 }
 
-impl Token {
-    pub fn flip(self) -> Self {
+impl std::ops::Not for Token {
+    type Output = Self;
+
+    #[must_use]
+    fn not(self) -> Self::Output {
         match self {
             Self::White => Self::Black,
             Self::Black => Self::White,
+        }
+    }
+}
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::White => write!(fmt, "\u{2593}\u{2593}"),
+            Self::Black => write!(fmt, "\u{2591}\u{2591}"),
         }
     }
 }
@@ -235,15 +247,6 @@ impl std::fmt::Display for Cell {
     }
 }
 
-impl std::fmt::Display for Token {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::White => write!(fmt, "\u{2593}\u{2593}"),
-            Self::Black => write!(fmt, "\u{2591}\u{2591}"),
-        }
-    }
-}
-
 #[derive(Debug, Eq, PartialEq)]
 struct Position {
     x: i8,
@@ -263,6 +266,7 @@ impl std::ops::Add<&Direction> for &Position {
 }
 
 impl Direction {
+    #[must_use]
     fn reverse(&self) -> Self {
         Self {
             x: -self.x,
