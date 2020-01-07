@@ -1,6 +1,6 @@
 #[derive(Debug, PartialEq)]
 pub enum Result {
-    Ok(u8),
+    Ok(u8, usize),
     Repeat,
     Quit,
     Error(String),
@@ -59,7 +59,7 @@ impl Human {
         match buffer.as_str() {
             "Q" | "q" => Result::Quit,
             _ => match buffer.parse::<u8>() {
-                Ok(i) => Result::Ok(i - 1),
+                Ok(i) => Result::Ok(i - 1, 1),
                 Err(e) => Result::Error(e.to_string()),
             },
         }
@@ -101,7 +101,7 @@ impl Ai {
         game: &Game,
         token: super::game::Token,
     ) -> Result {
-        Result::Ok(self.best_move(game, token))
+        Result::Ok(self.best_move(game, token), 0)
     }
 
     fn shuffle_columns(size: u8) -> Vec<u8> {

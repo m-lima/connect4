@@ -26,29 +26,40 @@ fn usage() {
     println!("    connect4 a a9      White: AI[level=8], Black: AI[level=9]");
 }
 
-fn print<Game: game::Game>(game: &Game, error: &mut Option<String>) {
-    // TODO: Only clear the printed area
-    //    print!("\x1b[2J");
+fn print<Game: game::Game>(game: &Game, error: &mut Option<String>, clear_size: usize) -> usize {
+    for _ in 0..clear_size {
+        print!("\x1b[0K");
+        print!("\x1b[1A");
+    }
+    print!("\x1b[K");
 
+    let mut size = 10_usize;
     if let Some(message) = error {
         println!("Error: {}", message);
         *error = None;
+        size += 1;
     }
 
     println!("{}", &game);
+    size
+}
+
+fn prepare_canvas() -> usize {
+    for _ in 0..10 {
+        println!();
+    }
+    10
 }
 
 fn start(white: &player::Player, black: &player::Player) {
     use game::Game;
     let mut game = game::new();
     let mut token = game::Token::White;
-
-    // TODO: Only clear the printed area
-    //       This local state can go away if clearing is done right
     let mut error: Option<String> = None;
+    let mut clear_size = prepare_canvas();
 
     loop {
-        print(&game, &mut error);
+        clear_size = print(&game, &mut error, clear_size);
 
         let play = match token {
             game::Token::White => white.play(&game, token),
@@ -56,17 +67,18 @@ fn start(white: &player::Player, black: &player::Player) {
         };
 
         match play {
-            player::Result::Ok(input) => match game.place(token, input) {
+            player::Result::Ok(input, footer) => match game.place(token, input) {
                 Ok(new_state) => {
+                    clear_size += footer;
                     game = new_state;
                     match game.status() {
                         game::Status::Victory => {
-                            print(&game, &mut None);
+                            print(&game, &mut None, clear_size);
                             println!("Player {} won by playing {}", token, input + 1);
                             break;
                         }
                         game::Status::Tie => {
-                            print(&game, &mut None);
+                            print(&game, &mut None, clear_size);
                             println!("It's a draw...");
                             break;
                         }
@@ -75,6 +87,7 @@ fn start(white: &player::Player, black: &player::Player) {
                     token = !token;
                 }
                 Err(e) => {
+                    clear_size += footer;
                     error = Some(e.to_string());
                 }
             },
