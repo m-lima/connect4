@@ -194,7 +194,7 @@ impl Board {
     }
 
     // TODO: Make dynamic
-    pub const fn size() -> u8 {
+    const fn size() -> u8 {
         7
     }
 }

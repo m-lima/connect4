@@ -27,8 +27,10 @@ pub struct Human {
     token: super::game::Token,
 }
 
-pub fn new_human(token: super::game::Token) -> Human {
-    Human { token }
+impl Human {
+    pub fn new(token: super::game::Token) -> Self {
+        Self { token }
+    }
 }
 
 impl Player for Human {
@@ -66,75 +68,99 @@ impl Player for Human {
 pub struct Ai {
     token: super::game::Token,
     depth: u8,
+    verbose: bool,
 }
 
-pub fn new_ai(token: super::game::Token, depth: u8) -> Ai {
-    Ai { token, depth }
+struct Play<T> {
+    col: u8,
+    value: T,
+}
+
+enum AiResult {
+    Threaded(std::thread::JoinHandle<Play<i64>>),
+    Static(Play<i64>),
+}
+
+impl AiResult {
+    fn resolve(self) -> Option<Play<i64>> {
+        match self {
+            Self::Threaded(r) => r.join().ok(),
+            Self::Static(r) => Some(r),
+        }
+    }
 }
 
 // TODO: Add tests
 impl Ai {
-    fn shuffle_columns() -> Vec<u8> {
+    pub fn new(token: super::game::Token, depth: u8, verbose: bool) -> Self {
+        Self {
+            token,
+            depth,
+            verbose,
+        }
+    }
+
+    fn shuffle_columns(size: u8) -> Vec<u8> {
         use rand::seq::SliceRandom;
         let mut rng = rand::thread_rng();
-        let mut columns = (0..super::game::Board::size()).collect::<Vec<u8>>();
+        let mut columns = (0..size).collect::<Vec<_>>();
         columns.shuffle(&mut rng);
         columns
     }
 
-    // TODO: Create struct with CMP for (u8, i64)
-    #[allow(clippy::filter_map)]
-    fn best_move<Game: super::game::Game + 'static>(&self, game: &Game) -> u8 {
-        enum Result {
-            Threaded(std::thread::JoinHandle<(u8, i64)>),
-            Static((u8, i64)),
-        }
-
-        let columns = Self::shuffle_columns();
-        columns
-            .into_iter()
-            .map(|x| (x, game.place(self.token, x)))
-            .filter(|result| result.1.is_ok())
-            .map(|result| {
-                let x = result.0;
-                let game = result.1.unwrap();
+    fn calculate_score<Game: super::game::Game + 'static>(
+        play: Play<std::result::Result<Game, super::game::Error>>,
+        token: super::game::Token,
+        depth: u8,
+    ) -> Option<AiResult> {
+        match play.value {
+            Ok(game) => {
                 if super::game::Status::Victory == game.status() {
-                    Result::Static((x, 7_i64.pow(u32::from(self.depth))))
-                } else if self.depth > 0 {
-                    let token = self.token;
-                    let depth = self.depth;
-                    Result::Threaded(std::thread::spawn(move || {
-                        (x, Self::dig(&game, depth - 1, token.flip(), -1))
+                    Some(AiResult::Static(Play {
+                        col: play.col,
+                        value: 7_i64.pow(u32::from(depth)),
                     }))
+                } else if depth > 0 {
+                    let col = play.col;
+                    Some(AiResult::Threaded(std::thread::spawn(move || Play {
+                        col,
+                        value: Self::dig(&game, depth - 1, token.flip(), -1),
+                    })))
                 } else {
-                    Result::Static((x, 0_i64))
+                    None
                 }
-            })
-            .collect::<Vec<Result>>()
-            .into_iter()
-            .map(|result| match result {
-                Result::Threaded(r) => r.join(),
-                Result::Static(r) => Ok(r),
-            })
-            .filter_map(std::result::Result::ok)
-            //            .map(|r| {
-            //                println!("Score for {}: {}", r.0 + 1, r.1);
-            //                r
-            //            })
-            .fold(
-                (0, i64::min_value()),
-                |acc, s| {
-                    if s.1 > acc.1 {
-                        s
-                    } else {
-                        acc
-                    }
-                },
-            )
-            .0
+            }
+            Err(_) => None,
+        }
     }
 
-    #[allow(clippy::filter_map)]
+    fn best_move<Game: super::game::Game + 'static>(&self, game: &Game) -> u8 {
+        let columns = Self::shuffle_columns(game.size());
+        columns
+            .into_iter()
+            .map(|col| Play {
+                col,
+                value: game.place(self.token, col),
+            })
+            .filter_map(|play| Self::calculate_score(play, self.token, self.depth))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .filter_map(AiResult::resolve)
+            .inspect(|play| {
+                if self.verbose {
+                    println!("Score for {}: {}", play.col + 1, play.value);
+                }
+            })
+            .fold(
+                Play {
+                    col: rand::random::<u8>() % game.size(),
+                    value: i64::min_value(),
+                },
+                max_score,
+            )
+            .col
+    }
+
     fn dig<Game: super::game::Game>(
         game: &Game,
         depth: u8,
@@ -142,32 +168,35 @@ impl Ai {
         factor: i64,
     ) -> i64 {
         if depth > 0 {
-            (0..super::game::Board::size())
-                .map(|x| game.place(token, x))
+            #[allow(clippy::filter_map)]
+            (0..game.size())
+                .map(|col| game.place(token, col))
                 .filter_map(std::result::Result::ok)
-                .map(|g| {
-                    if super::game::Status::Victory == g.status() {
+                .map(|game| {
+                    if super::game::Status::Victory == game.status() {
                         factor * 7_i64.pow(u32::from(depth))
                     } else {
-                        Self::dig(&g, depth - 1, token.flip(), -factor)
+                        Self::dig(&game, depth - 1, token.flip(), -factor)
                     }
                 })
                 .sum::<i64>()
         } else {
-            (0..super::game::Board::size())
-                .map(|x| game.plan(token, x))
+            (0..game.size())
+                .map(|col| game.plan(token, col))
                 .filter_map(std::result::Result::ok)
-                .map(|s| {
-                    if let super::game::Status::Victory = s {
-                        1
-                    } else {
-                        0
-                    }
-                })
-                .sum::<i64>()
+                .filter(|status| super::game::Status::Victory == *status)
+                .count() as i64
                 * factor
                 * i64::from(depth)
         }
+    }
+}
+
+fn max_score(left: Play<i64>, right: Play<i64>) -> Play<i64> {
+    if left.value > right.value {
+        left
+    } else {
+        right
     }
 }
 
