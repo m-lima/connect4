@@ -1,6 +1,6 @@
 #[derive(Debug, PartialEq)]
 pub enum Result {
-    Ok((u8, super::game::Token)),
+    Ok(u8),
     Repeat,
     Quit,
     Error(String),
@@ -16,26 +16,31 @@ impl std::fmt::Display for Result {
     }
 }
 
-pub trait Player {
-    fn play<Game: super::game::Game + 'static>(&self, game: &Game) -> Result;
-    fn token(&self) -> super::game::Token;
+pub enum Player {
+    Ai(Ai),
+    Human,
 }
 
-pub struct Human {
-    token: super::game::Token,
-}
-
-impl Human {
-    pub fn new(token: super::game::Token) -> Self {
-        Self { token }
+impl Player {
+    pub fn play<Game: super::game::Game + 'static>(
+        &self,
+        game: &Game,
+        token: super::game::Token,
+    ) -> Result {
+        match self {
+            Self::Ai(ai) => ai.play(game, token),
+            Self::Human => Human::play(token),
+        }
     }
 }
 
-impl Player for Human {
-    fn play<Game: super::game::Game + 'static>(&self, _: &Game) -> Result {
+struct Human;
+
+impl Human {
+    fn play(token: super::game::Token) -> Result {
         {
             use std::io::Write;
-            print!("Select the column for {}: ", self.token);
+            print!("Select the column for {}: ", token);
             let _ = std::io::stdout().flush();
         }
 
@@ -52,35 +57,30 @@ impl Player for Human {
         match buffer.as_str() {
             "Q" | "q" => Result::Quit,
             _ => match buffer.parse::<u8>() {
-                Ok(i) => Result::Ok((i - 1, self.token)),
+                Ok(i) => Result::Ok(i - 1),
                 Err(e) => Result::Error(e.to_string()),
             },
         }
     }
-
-    fn token(&self) -> super::game::Token {
-        self.token
-    }
 }
 
 pub struct Ai {
-    token: super::game::Token,
     depth: u8,
     verbose: bool,
 }
 
-struct Play<T> {
+struct AiPlay<T> {
     col: u8,
     value: T,
 }
 
 enum AiResult {
-    Threaded(std::thread::JoinHandle<Play<i64>>),
-    Static(Play<i64>),
+    Threaded(std::thread::JoinHandle<AiPlay<i64>>),
+    Static(AiPlay<i64>),
 }
 
 impl AiResult {
-    fn resolve(self) -> Option<Play<i64>> {
+    fn resolve(self) -> Option<AiPlay<i64>> {
         match self {
             Self::Threaded(r) => r.join().ok(),
             Self::Static(r) => Some(r),
@@ -90,12 +90,16 @@ impl AiResult {
 
 // TODO: Add tests
 impl Ai {
-    pub fn new(token: super::game::Token, depth: u8, verbose: bool) -> Self {
-        Self {
-            token,
-            depth,
-            verbose,
-        }
+    pub fn new(depth: u8, verbose: bool) -> Self {
+        Self { depth, verbose }
+    }
+
+    fn play<Game: super::game::Game + 'static>(
+        &self,
+        game: &Game,
+        token: super::game::Token,
+    ) -> Result {
+        Result::Ok(self.best_move(game, token))
     }
 
     fn shuffle_columns(size: u8) -> Vec<u8> {
@@ -107,20 +111,20 @@ impl Ai {
     }
 
     fn calculate_score<Game: super::game::Game + 'static>(
-        play: Play<std::result::Result<Game, super::game::Error>>,
+        play: AiPlay<std::result::Result<Game, super::game::Error>>,
         token: super::game::Token,
         depth: u8,
     ) -> Option<AiResult> {
         match play.value {
             Ok(game) => {
                 if super::game::Status::Victory == game.status() {
-                    Some(AiResult::Static(Play {
+                    Some(AiResult::Static(AiPlay {
                         col: play.col,
                         value: 7_i64.pow(u32::from(depth)),
                     }))
                 } else if depth > 0 {
                     let col = play.col;
-                    Some(AiResult::Threaded(std::thread::spawn(move || Play {
+                    Some(AiResult::Threaded(std::thread::spawn(move || AiPlay {
                         col,
                         value: Self::dig(&game, depth - 1, !token, -1),
                     })))
@@ -132,15 +136,19 @@ impl Ai {
         }
     }
 
-    fn best_move<Game: super::game::Game + 'static>(&self, game: &Game) -> u8 {
+    fn best_move<Game: super::game::Game + 'static>(
+        &self,
+        game: &Game,
+        token: super::game::Token,
+    ) -> u8 {
         let columns = Self::shuffle_columns(game.size());
         columns
             .into_iter()
-            .map(|col| Play {
+            .map(|col| AiPlay {
                 col,
-                value: game.place(self.token, col),
+                value: game.place(token, col),
             })
-            .filter_map(|play| Self::calculate_score(play, self.token, self.depth))
+            .filter_map(|play| Self::calculate_score(play, token, self.depth))
             .collect::<Vec<_>>()
             .into_iter()
             .filter_map(AiResult::resolve)
@@ -150,11 +158,11 @@ impl Ai {
                 }
             })
             .fold(
-                Play {
+                AiPlay {
                     col: rand::random::<u8>() % game.size(),
                     value: i64::min_value(),
                 },
-                max_score,
+                Self::max_score,
             )
             .col
     }
@@ -188,22 +196,12 @@ impl Ai {
                 * i64::from(depth)
         }
     }
-}
 
-fn max_score(left: Play<i64>, right: Play<i64>) -> Play<i64> {
-    if left.value > right.value {
-        left
-    } else {
-        right
-    }
-}
-
-impl Player for Ai {
-    fn play<Game: super::game::Game + 'static>(&self, game: &Game) -> Result {
-        Result::Ok((self.best_move(game), self.token))
-    }
-
-    fn token(&self) -> super::game::Token {
-        self.token
+    fn max_score(left: AiPlay<i64>, right: AiPlay<i64>) -> AiPlay<i64> {
+        if left.value > right.value {
+            left
+        } else {
+            right
+        }
     }
 }

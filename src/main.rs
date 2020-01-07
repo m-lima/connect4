@@ -16,61 +16,62 @@ fn usage() {
     println!("\tconnect4 s\t(Player 1: AI, Player 2: Human)");
 }
 
-fn print<Game: game::Game>(game: &Game, error: &Option<String>) {
+fn print<Game: game::Game>(game: &Game, error: &mut Option<String>) {
     // TODO: Only clear the printed area
     //    print!("\x1b[2J");
 
     if let Some(message) = error {
         println!("Error: {}", message);
+        *error = None;
     }
 
     println!("{}", &game);
 }
 
-fn start<White: player::Player, Black: player::Player>(white: &White, black: &Black) {
+fn start(white: &player::Player, black: &player::Player) {
     use game::Game;
     let mut game = game::new();
-    let mut whites_turn = true;
+    let mut token = game::Token::White;
     let mut error: Option<String> = None;
 
     loop {
-        print(&game, &error);
-        error = None;
+        print(&game, &mut error);
 
-        match if whites_turn {
-            white.play(&game)
-        } else {
-            black.play(&game)
-        } {
-            player::Result::Error(message) => {
-                error = Some(message);
-            }
-            player::Result::Quit => {
-                break;
-            }
-            player::Result::Repeat => {}
-            player::Result::Ok((input, token)) => match game.place(token, input) {
+        let play = match token {
+            game::Token::White => white.play(&game, token),
+            game::Token::Black => black.play(&game, token),
+        };
+
+        match play {
+            player::Result::Ok(input) => match game.place(token, input) {
                 Ok(new_state) => {
                     game = new_state;
                     match game.status() {
                         game::Status::Victory => {
-                            print(&game, &None);
+                            print(&game, &mut None);
                             println!("Player {} won by playing {}", token, input + 1);
                             break;
                         }
                         game::Status::Tie => {
-                            print(&game, &None);
+                            print(&game, &mut None);
                             println!("It's a draw...");
                             break;
                         }
                         _ => {}
                     }
-                    whites_turn = !whites_turn;
+                    token = !token;
                 }
                 Err(e) => {
                     error = Some(e.to_string());
                 }
             },
+            player::Result::Error(message) => {
+                error = Some(message);
+            }
+            player::Result::Repeat => {}
+            player::Result::Quit => {
+                break;
+            }
         }
     }
 }
@@ -79,9 +80,13 @@ fn main() {
     // TODO: Configure players (possibly over TCP), size, and depth
     usage();
 
+    //    let (white, black) = (
+    //        player::Ai::new(game::Token::White, 8, false),
+    //        player::Human::new(game::Token::Black),
+    //    );
     let (white, black) = (
-        player::Ai::new(game::Token::White, 8, false),
-        player::Human::new(game::Token::Black),
+        player::Player::Ai(player::Ai::new(8, false)),
+        player::Player::Human,
     );
 
     start(&white, &black);
