@@ -19,6 +19,7 @@ impl std::fmt::Display for Result {
 pub enum Player {
     Ai(Ai),
     Human,
+    Tcp,
 }
 
 impl Player {
@@ -28,8 +29,9 @@ impl Player {
         token: super::game::Token,
     ) -> Result {
         match self {
-            Self::Ai(ai) => ai.play(game, token),
+            Self::Ai(ai) => Ai::play(ai, game, token),
             Self::Human => Human::play(token),
+            Self::Tcp => unimplemented!(),
         }
     }
 }

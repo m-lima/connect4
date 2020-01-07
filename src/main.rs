@@ -5,15 +5,25 @@
 mod game;
 mod player;
 
+enum Result {
+    Players(player::Player, player::Player),
+    Help,
+    Error,
+}
+
 fn usage() {
-    println!("Usage: connect4 [PLAYERS]");
-    println!("\tPLAYERS: \"h\" for human \"a\" for ai");
-    println!("\t         \"s\" is a short-hand for \"ah\"");
+    println!("Usage: connect4 [-h] [-v] [PLAYER [PLAYER]]");
+    println!("    PLAYER:");
+    println!("        h              Human player");
+    println!("        a[level]       AI player, where level=difficulty");
+    println!("    -h                 Show this help message");
+    println!("    -v                 If an AI is present, make it verbose");
     println!();
     println!("Example:");
-    println!("\tconnect4 ha\t(Player 1: Human, Player 2: AI) [default]");
-    println!("\tconnect4 \t(Player 1: Human: Player 2: AI)");
-    println!("\tconnect4 s\t(Player 1: AI, Player 2: Human)");
+    println!("    connect4           White: Human, Black: AI[level=8]");
+    println!("    connect4 a6 h      White: AI[level=6], Black: Human");
+    println!("    connect4 h         White: Human, Black: Human");
+    println!("    connect4 a a9      White: AI[level=8], Black: AI[level=9]");
 }
 
 fn print<Game: game::Game>(game: &Game, error: &mut Option<String>) {
@@ -32,6 +42,9 @@ fn start(white: &player::Player, black: &player::Player) {
     use game::Game;
     let mut game = game::new();
     let mut token = game::Token::White;
+
+    // TODO: Only clear the printed area
+    //       This local state can go away if clearing is done right
     let mut error: Option<String> = None;
 
     loop {
@@ -76,18 +89,76 @@ fn start(white: &player::Player, black: &player::Player) {
     }
 }
 
+fn parse_args() -> Result {
+    let args = std::env::args().skip(1).collect::<Vec<_>>();
+    let mut verbose = false;
+    let mut white: Option<player::Player> = None;
+    let mut black: Option<player::Player> = None;
+
+    for arg in &args {
+        match arg.as_str() {
+            "-h" => {
+                if white.is_some() {
+                    return Result::Error;
+                }
+                return Result::Help;
+            }
+            "-v" => {
+                if white.is_some() {
+                    return Result::Error;
+                }
+                verbose = true;
+            }
+            "h" => {
+                if white.is_none() {
+                    white = Some(player::Player::Human)
+                } else if black.is_none() {
+                    black = Some(player::Player::Human)
+                }
+            }
+            _ => {
+                if let Some(c) = arg.chars().nth(0) {
+                    if c == 'a' {
+                        let level_string = arg.chars().skip(1).collect::<String>();
+                        let level = if level_string.is_empty() {
+                            Ok(8_u8)
+                        } else {
+                            level_string.parse::<u8>()
+                        };
+                        if let Ok(level) = level {
+                            if white.is_none() {
+                                white = Some(player::Player::Ai(player::Ai::new(level, verbose)));
+                                continue;
+                            } else if black.is_none() {
+                                black = Some(player::Player::Ai(player::Ai::new(level, verbose)));
+                                continue;
+                            }
+                        }
+                    }
+                }
+                return Result::Error;
+            }
+        }
+    }
+
+    Result::Players(
+        white.unwrap_or_else(|| player::Player::Ai(player::Ai::new(8, verbose))),
+        black.unwrap_or_else(|| player::Player::Human),
+    )
+}
+
 fn main() {
-    // TODO: Configure players (possibly over TCP), size, and depth
-    usage();
-
-    //    let (white, black) = (
-    //        player::Ai::new(game::Token::White, 8, false),
-    //        player::Human::new(game::Token::Black),
-    //    );
-    let (white, black) = (
-        player::Player::Ai(player::Ai::new(8, false)),
-        player::Player::Human,
-    );
-
-    start(&white, &black);
+    match parse_args() {
+        Result::Help => {
+            usage();
+        }
+        Result::Error => {
+            println!("Invalid arguments");
+            println!();
+            usage();
+        }
+        Result::Players(white, black) => {
+            start(&white, &black);
+        }
+    }
 }
