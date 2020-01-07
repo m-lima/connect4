@@ -5,8 +5,6 @@
 mod game;
 mod player;
 
-use game::Game;
-
 fn usage() {
     println!("Usage: connect4 [PLAYERS]");
     println!("\tPLAYERS: \"h\" for human \"a\" for ai");
@@ -31,7 +29,10 @@ fn print(game: &game::Connect4, error: &Option<String>) {
     println!("{}", &game);
 }
 
-fn play<Player: player::Player, Game: game::Game>(player: &Player, game: &Game) -> player::Result {
+fn play<Player: player::Player, Game: game::Game + 'static>(
+    player: &Player,
+    game: &Game,
+) -> player::Result {
     player.play(game)
 }
 
@@ -41,7 +42,7 @@ fn main() {
 
     let mut turn = true;
     let black = player::new_human(game::Token::Black);
-    let white = player::new_ai(game::Token::White, 7);
+    let white = player::new_ai(game::Token::White, 8);
 
     let mut error: Option<String> = None;
 
@@ -64,28 +65,31 @@ fn main() {
                 break;
             }
             player::Result::Repeat => {}
-            player::Result::Ok((input, token)) => match game.place(token, input) {
-                Ok(new_state) => {
-                    game = new_state;
-                    match game.status() {
-                        game::Status::Victory => {
-                            print(&game, &None);
-                            println!("Player {} won by playing {}", token, input + 1);
-                            break;
+            player::Result::Ok((input, token)) => {
+                use game::Game;
+                match game.place(token, input) {
+                    Ok(new_state) => {
+                        game = new_state;
+                        match game.status() {
+                            game::Status::Victory => {
+                                print(&game, &None);
+                                println!("Player {} won by playing {}", token, input + 1);
+                                break;
+                            }
+                            game::Status::Tie => {
+                                print(&game, &None);
+                                println!("It's a draw...");
+                                break;
+                            }
+                            _ => {}
                         }
-                        game::Status::Tie => {
-                            print(&game, &None);
-                            println!("It's a draw...");
-                            break;
-                        }
-                        _ => {}
+                        turn = !turn;
                     }
-                    turn = !turn;
+                    Err(e) => {
+                        error = Some(e.to_string());
+                    }
                 }
-                Err(e) => {
-                    error = Some(e.to_string());
-                }
-            },
+            }
         }
     }
 }

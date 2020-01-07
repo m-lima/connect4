@@ -17,7 +17,7 @@ impl std::fmt::Display for Result {
 }
 
 pub trait Player {
-    fn play<Game: super::game::Game>(&self, game: &Game) -> Result
+    fn play<Game: super::game::Game + 'static>(&self, game: &Game) -> Result
     where
         Self: Sized;
     fn token(&self) -> super::game::Token;
@@ -32,7 +32,7 @@ pub fn new_human(token: super::game::Token) -> Human {
 }
 
 impl Player for Human {
-    fn play<Game: super::game::Game>(&self, _: &Game) -> Result {
+    fn play<Game: super::game::Game + 'static>(&self, _: &Game) -> Result {
         {
             use std::io::Write;
             print!("Select the column for {}: ", self.token);
@@ -82,24 +82,41 @@ impl Ai {
         columns
     }
 
-    // TODO: Parallelize
+    // TODO: Create struct with CMP for (u8, i64)
     #[allow(clippy::filter_map)]
-    fn best_move<Game: super::game::Game>(&self, game: &Game) -> u8 {
+    fn best_move<Game: super::game::Game + 'static>(&self, game: &Game) -> u8 {
+        enum Result {
+            Threaded(std::thread::JoinHandle<(u8, i64)>),
+            Static((u8, i64)),
+        }
+
         let columns = Self::shuffle_columns();
         columns
             .into_iter()
             .map(|x| (x, game.place(self.token, x)))
-            .filter(|r| r.1.is_ok())
-            .map(|r| {
-                let g = r.1.unwrap();
-                if super::game::Status::Victory == g.status() {
-                    (r.0, 7_i64.pow(u32::from(self.depth)))
+            .filter(|result| result.1.is_ok())
+            .map(|result| {
+                let x = result.0;
+                let game = result.1.unwrap();
+                if super::game::Status::Victory == game.status() {
+                    Result::Static((x, 7_i64.pow(u32::from(self.depth))))
                 } else if self.depth > 0 {
-                    (r.0, Self::dig(&g, self.depth - 1, self.token.flip(), -1))
+                    let token = self.token;
+                    let depth = self.depth;
+                    Result::Threaded(std::thread::spawn(move || {
+                        (x, Self::dig(&game, depth - 1, token.flip(), -1))
+                    }))
                 } else {
-                    (r.0, 0_i64)
+                    Result::Static((x, 0_i64))
                 }
             })
+            .collect::<Vec<Result>>()
+            .into_iter()
+            .map(|result| match result {
+                Result::Threaded(r) => r.join(),
+                Result::Static(r) => Ok(r),
+            })
+            .filter_map(std::result::Result::ok)
             //            .map(|r| {
             //                println!("Score for {}: {}", r.0 + 1, r.1);
             //                r
@@ -155,7 +172,7 @@ impl Ai {
 }
 
 impl Player for Ai {
-    fn play<Game: super::game::Game>(&self, game: &Game) -> Result {
+    fn play<Game: super::game::Game + 'static>(&self, game: &Game) -> Result {
         Result::Ok((self.best_move(game), self.token))
     }
 

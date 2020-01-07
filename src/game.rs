@@ -20,7 +20,7 @@ pub enum Status {
     Ongoing,
 }
 
-pub trait Game: Sized {
+pub trait Game: Sized + Send {
     fn place(&self, token: Token, x: u8) -> Result<Self, Error>;
     fn plan(&self, token: Token, x: u8) -> Result<Status, Error>;
     fn status(&self) -> Status;
@@ -37,34 +37,6 @@ pub fn new() -> Connect4 {
 pub struct Connect4 {
     board: Board,
     status: Status,
-}
-
-impl Game for Connect4 {
-    #[allow(clippy::cast_sign_loss)]
-    fn place(&self, token: Token, x: u8) -> Result<Self, Error> {
-        let position = self.fall_position(x)?;
-        Ok({
-            let mut cells = self.board.cells;
-            cells[position.y as usize][position.x as usize] = Cell::Token(token);
-            let board = Board { cells };
-            let status = Self::build_status(token, &position, &board);
-
-            Self { board, status }
-        })
-    }
-
-    fn plan(&self, token: Token, x: u8) -> Result<Status, Error> {
-        let position = self.fall_position(x)?;
-        Ok(Self::build_status(token, &position, &self.board))
-    }
-
-    fn status(&self) -> Status {
-        self.status
-    }
-
-    fn size(&self) -> u8 {
-        Board::size()
-    }
 }
 
 impl Connect4 {
@@ -137,6 +109,34 @@ impl Connect4 {
         } else {
             position
         }
+    }
+}
+
+impl Game for Connect4 {
+    #[allow(clippy::cast_sign_loss)]
+    fn place(&self, token: Token, x: u8) -> Result<Self, Error> {
+        let position = self.fall_position(x)?;
+        Ok({
+            let mut cells = self.board.cells;
+            cells[position.y as usize][position.x as usize] = Cell::Token(token);
+            let board = Board { cells };
+            let status = Self::build_status(token, &position, &board);
+
+            Self { board, status }
+        })
+    }
+
+    fn plan(&self, token: Token, x: u8) -> Result<Status, Error> {
+        let position = self.fall_position(x)?;
+        Ok(Self::build_status(token, &position, &self.board))
+    }
+
+    fn status(&self) -> Status {
+        self.status
+    }
+
+    fn size(&self) -> u8 {
+        Board::size()
     }
 }
 
