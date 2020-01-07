@@ -26,29 +26,29 @@ fn usage() {
     println!("    connect4 a a9      White: AI[level=8], Black: AI[level=9]");
 }
 
+// TODO: Make the stateful canvas less messy
 fn print<Game: game::Game>(game: &Game, error: &mut Option<String>, clear_size: usize) -> usize {
     for _ in 0..clear_size {
         print!("\x1b[0K");
         print!("\x1b[1A");
     }
     print!("\x1b[K");
+    println!("{}", &game);
 
-    let mut size = 10_usize;
     if let Some(message) = error {
         println!("Error: {}", message);
         *error = None;
-        size += 1;
+        12
+    } else {
+        11
     }
-
-    println!("{}", &game);
-    size
 }
 
 fn prepare_canvas() -> usize {
-    for _ in 0..10 {
+    for _ in 0..11 {
         println!();
     }
-    10
+    11
 }
 
 fn start(white: &player::Player, black: &player::Player) {
@@ -67,9 +67,8 @@ fn start(white: &player::Player, black: &player::Player) {
         };
 
         match play {
-            player::Result::Ok(input, footer) => match game.place(token, input) {
+            player::Result::Ok(input) => match game.place(token, input) {
                 Ok(new_state) => {
-                    clear_size += footer;
                     game = new_state;
                     match game.status() {
                         game::Status::Victory => {
@@ -87,7 +86,6 @@ fn start(white: &player::Player, black: &player::Player) {
                     token = !token;
                 }
                 Err(e) => {
-                    clear_size += footer;
                     error = Some(e.to_string());
                 }
             },
