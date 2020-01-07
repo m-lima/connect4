@@ -16,9 +16,7 @@ fn usage() {
     println!("\tconnect4 s\t(Player 1: AI, Player 2: Human)");
 }
 
-fn clear() {}
-
-fn print(game: &game::Connect4, error: &Option<String>) {
+fn print<Game: game::Game>(game: &Game, error: &Option<String>) {
     // TODO: Only clear the printed area
     //    print!("\x1b[2J");
 
@@ -29,34 +27,20 @@ fn print(game: &game::Connect4, error: &Option<String>) {
     println!("{}", &game);
 }
 
-fn play<Player: player::Player, Game: game::Game + 'static>(
-    player: &Player,
-    game: &Game,
-) -> player::Result {
-    player.play(game)
-}
-
-fn main() {
-    // TODO: Configure players (possibly over TCP), size, and depth
+fn start<White: player::Player, Black: player::Player>(white: &White, black: &Black) {
+    use game::Game;
     let mut game = game::new();
-
-    let mut turn = true;
-    let black = player::Human::new(game::Token::Black);
-    let white = player::Ai::new(game::Token::White, 8, false);
-
+    let mut whites_turn = true;
     let mut error: Option<String> = None;
-
-    clear();
-    usage();
 
     loop {
         print(&game, &error);
         error = None;
 
-        match if turn {
-            play(&white, &game)
+        match if whites_turn {
+            white.play(&game)
         } else {
-            play(&black, &game)
+            black.play(&game)
         } {
             player::Result::Error(message) => {
                 error = Some(message);
@@ -65,31 +49,40 @@ fn main() {
                 break;
             }
             player::Result::Repeat => {}
-            player::Result::Ok((input, token)) => {
-                use game::Game;
-                match game.place(token, input) {
-                    Ok(new_state) => {
-                        game = new_state;
-                        match game.status() {
-                            game::Status::Victory => {
-                                print(&game, &None);
-                                println!("Player {} won by playing {}", token, input + 1);
-                                break;
-                            }
-                            game::Status::Tie => {
-                                print(&game, &None);
-                                println!("It's a draw...");
-                                break;
-                            }
-                            _ => {}
+            player::Result::Ok((input, token)) => match game.place(token, input) {
+                Ok(new_state) => {
+                    game = new_state;
+                    match game.status() {
+                        game::Status::Victory => {
+                            print(&game, &None);
+                            println!("Player {} won by playing {}", token, input + 1);
+                            break;
                         }
-                        turn = !turn;
+                        game::Status::Tie => {
+                            print(&game, &None);
+                            println!("It's a draw...");
+                            break;
+                        }
+                        _ => {}
                     }
-                    Err(e) => {
-                        error = Some(e.to_string());
-                    }
+                    whites_turn = !whites_turn;
                 }
-            }
+                Err(e) => {
+                    error = Some(e.to_string());
+                }
+            },
         }
     }
+}
+
+fn main() {
+    // TODO: Configure players (possibly over TCP), size, and depth
+    usage();
+
+    let (white, black) = (
+        player::Ai::new(game::Token::White, 8, false),
+        player::Human::new(game::Token::Black),
+    );
+
+    start(&white, &black);
 }

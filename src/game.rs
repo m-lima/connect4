@@ -20,26 +20,45 @@ pub enum Status {
     Ongoing,
 }
 
-pub trait Game: Sized + Send {
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Token {
+    White,
+    Black,
+}
+
+impl Token {
+    pub fn flip(self) -> Self {
+        match self {
+            Self::White => Self::Black,
+            Self::Black => Self::White,
+        }
+    }
+}
+
+pub trait Game: Sized + Send + std::fmt::Display {
     fn place(&self, token: Token, x: u8) -> Result<Self, Error>;
     fn plan(&self, token: Token, x: u8) -> Result<Status, Error>;
     fn status(&self) -> Status;
     fn size(&self) -> u8;
 }
 
-pub fn new() -> Connect4 {
-    Connect4 {
-        board: Board::new(),
-        status: Status::Ongoing,
-    }
+pub fn new() -> impl Game {
+    Connect4::new()
 }
 
-pub struct Connect4 {
+struct Connect4 {
     board: Board,
     status: Status,
 }
 
 impl Connect4 {
+    fn new() -> Self {
+        Self {
+            board: Board::new(),
+            status: Status::Ongoing,
+        }
+    }
+
     fn build_status(token: Token, position: &Position, board: &Board) -> Status {
         if Self::tie(&position, &board) {
             Status::Tie
@@ -161,7 +180,7 @@ impl std::fmt::Display for Connect4 {
     }
 }
 
-pub struct Board {
+struct Board {
     cells: [[Cell; Self::usize()]; Self::usize()],
 }
 
@@ -212,21 +231,6 @@ impl std::fmt::Display for Cell {
             Self::Empty => write!(fmt, "  "),
             Self::OutOfBounds => write!(fmt, ""),
             Self::Token(p) => write!(fmt, "{}", p),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum Token {
-    White,
-    Black,
-}
-
-impl Token {
-    pub fn flip(self) -> Self {
-        match self {
-            Self::White => Self::Black,
-            Self::Black => Self::White,
         }
     }
 }
@@ -285,7 +289,7 @@ mod tests {
 
         #[test]
         fn place() {
-            let mut game = new();
+            let mut game = Connect4::new();
             game = game.place(Token::Black, 1).unwrap();
             assert_eq!(game.status(), Status::Ongoing);
             game = game.place(Token::White, 2).unwrap();
@@ -312,7 +316,7 @@ mod tests {
 
         #[test]
         fn place_errors() {
-            let mut game = new();
+            let mut game = Connect4::new();
 
             game = game.place(Token::White, 3).unwrap();
             game = game.place(Token::White, 3).unwrap();
@@ -334,7 +338,7 @@ mod tests {
 
         #[test]
         fn victory() {
-            let mut game = new();
+            let mut game = Connect4::new();
 
             game.board.cells[6][2] = Cell::Token(Token::Black);
             game.board.cells[5][2] = Cell::Token(Token::Black);
@@ -375,7 +379,7 @@ mod tests {
 
         #[test]
         fn fall_position() {
-            let mut game = new();
+            let mut game = Connect4::new();
             game.board.cells[3][2] = Cell::Token(Token::Black);
             game.board.cells[6][4] = Cell::Token(Token::White);
 

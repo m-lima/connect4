@@ -17,9 +17,7 @@ impl std::fmt::Display for Result {
 }
 
 pub trait Player {
-    fn play<Game: super::game::Game + 'static>(&self, game: &Game) -> Result
-    where
-        Self: Sized;
+    fn play<Game: super::game::Game + 'static>(&self, game: &Game) -> Result;
     fn token(&self) -> super::game::Token;
 }
 
