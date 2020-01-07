@@ -20,22 +20,28 @@ pub enum Status {
     Ongoing,
 }
 
-pub fn new() -> Game {
-    Game {
+pub trait Game: Sized {
+    fn place(&self, token: Token, x: u8) -> Result<Self, Error>;
+    fn plan(&self, token: Token, x: u8) -> Result<Status, Error>;
+    fn status(&self) -> Status;
+    fn size(&self) -> u8;
+}
+
+pub fn new() -> Connect4 {
+    Connect4 {
         board: Board::new(),
         status: Status::Ongoing,
     }
 }
 
-pub struct Game {
+pub struct Connect4 {
     board: Board,
     status: Status,
 }
 
-// TODO: Make trait for tests
-impl Game {
+impl Game for Connect4 {
     #[allow(clippy::cast_sign_loss)]
-    pub fn place(&self, token: Token, x: u8) -> Result<Self, Error> {
+    fn place(&self, token: Token, x: u8) -> Result<Self, Error> {
         let position = self.fall_position(x)?;
         Ok({
             let mut cells = self.board.cells;
@@ -47,15 +53,21 @@ impl Game {
         })
     }
 
-    pub fn plan(&self, token: Token, x: u8) -> Result<Status, Error> {
+    fn plan(&self, token: Token, x: u8) -> Result<Status, Error> {
         let position = self.fall_position(x)?;
         Ok(Self::build_status(token, &position, &self.board))
     }
 
-    pub fn status(&self) -> Status {
+    fn status(&self) -> Status {
         self.status
     }
 
+    fn size(&self) -> u8 {
+        Board::size()
+    }
+}
+
+impl Connect4 {
     fn build_status(token: Token, position: &Position, board: &Board) -> Status {
         if Self::tie(&position, &board) {
             Status::Tie
@@ -128,7 +140,7 @@ impl Game {
     }
 }
 
-impl std::fmt::Display for Game {
+impl std::fmt::Display for Connect4 {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for row in &self.board.cells {
             for cell in row {
@@ -338,25 +350,25 @@ mod tests {
             game.board.cells[4][5] = Cell::Token(Token::Black);
 
             assert_eq!(
-                Game::victory(Token::Black, &Position { x: 2, y: 5 }, &game.board),
+                Connect4::victory(Token::Black, &Position { x: 2, y: 5 }, &game.board),
                 false
             );
             assert_eq!(
-                Game::victory(Token::White, &Position { x: 0, y: 1 }, &game.board),
+                Connect4::victory(Token::White, &Position { x: 0, y: 1 }, &game.board),
                 false
             );
             assert_eq!(
-                Game::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
+                Connect4::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
                 false
             );
 
             game.board.cells[3][3] = Cell::Token(Token::Black);
             assert_eq!(
-                Game::victory(Token::White, &Position { x: 5, y: 5 }, &game.board),
+                Connect4::victory(Token::White, &Position { x: 5, y: 5 }, &game.board),
                 false
             );
             assert_eq!(
-                Game::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
+                Connect4::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
                 true
             );
         }

@@ -5,6 +5,8 @@
 mod game;
 mod player;
 
+use game::Game;
+
 fn usage() {
     println!("Usage: connect4 [PLAYERS]");
     println!("\tPLAYERS: \"h\" for human \"a\" for ai");
@@ -18,9 +20,9 @@ fn usage() {
 
 fn clear() {}
 
-fn print(game: &game::Game, error: &Option<String>) {
+fn print(game: &game::Connect4, error: &Option<String>) {
     // TODO: Only clear the printed area
-//    print!("\x1b[2J");
+    //    print!("\x1b[2J");
 
     if let Some(message) = error {
         println!("Error: {}", message);
@@ -29,13 +31,17 @@ fn print(game: &game::Game, error: &Option<String>) {
     println!("{}", &game);
 }
 
+fn play<Player: player::Player, Game: game::Game>(player: &Player, game: &Game) -> player::Result {
+    player.play(game)
+}
+
 fn main() {
-    // TODO: Configure players, size, and depth
+    // TODO: Configure players (possibly over TCP), size, and depth
     let mut game = game::new();
 
-    let mut turn = false;
-    let white = player::new_human(game::Token::White);
-    let black = player::new_ai(game::Token::Black, 7);
+    let mut turn = true;
+    let black = player::new_human(game::Token::Black);
+    let white = player::new_ai(game::Token::White, 7);
 
     let mut error: Option<String> = None;
 
@@ -43,11 +49,14 @@ fn main() {
     usage();
 
     loop {
-        let player: &dyn player::Player = if turn { &white } else { &black };
         print(&game, &error);
         error = None;
 
-        match player.play(&game) {
+        match if turn {
+            play(&white, &game)
+        } else {
+            play(&black, &game)
+        } {
             player::Result::Error(message) => {
                 error = Some(message);
             }
@@ -55,13 +64,13 @@ fn main() {
                 break;
             }
             player::Result::Repeat => {}
-            player::Result::Ok(input) => match game.place(player.token(), input) {
+            player::Result::Ok((input, token)) => match game.place(token, input) {
                 Ok(new_state) => {
                     game = new_state;
                     match game.status() {
                         game::Status::Victory => {
                             print(&game, &None);
-                            println!("Player {} won by playing {}", player.token(), input + 1);
+                            println!("Player {} won by playing {}", token, input + 1);
                             break;
                         }
                         game::Status::Tie => {

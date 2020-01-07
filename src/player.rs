@@ -1,6 +1,6 @@
 #[derive(Debug, PartialEq)]
 pub enum Result {
-    Ok(u8),
+    Ok((u8, super::game::Token)),
     Repeat,
     Quit,
     Error(String),
@@ -17,7 +17,9 @@ impl std::fmt::Display for Result {
 }
 
 pub trait Player {
-    fn play(&self, game: &super::game::Game) -> Result;
+    fn play<Game: super::game::Game>(&self, game: &Game) -> Result
+    where
+        Self: Sized;
     fn token(&self) -> super::game::Token;
 }
 
@@ -30,7 +32,7 @@ pub fn new_human(token: super::game::Token) -> Human {
 }
 
 impl Player for Human {
-    fn play(&self, _: &super::game::Game) -> Result {
+    fn play<Game: super::game::Game>(&self, _: &Game) -> Result {
         {
             use std::io::Write;
             print!("Select the column for {}: ", self.token);
@@ -50,7 +52,7 @@ impl Player for Human {
         match buffer.as_str() {
             "Q" | "q" => Result::Quit,
             _ => match buffer.parse::<u8>() {
-                Ok(i) => Result::Ok(i - 1),
+                Ok(i) => Result::Ok((i - 1, self.token)),
                 Err(e) => Result::Error(e.to_string()),
             },
         }
@@ -82,7 +84,7 @@ impl Ai {
 
     // TODO: Parallelize
     #[allow(clippy::filter_map)]
-    fn best_move(&self, game: &super::game::Game) -> u8 {
+    fn best_move<Game: super::game::Game>(&self, game: &Game) -> u8 {
         let columns = Self::shuffle_columns();
         columns
             .into_iter()
@@ -116,7 +118,12 @@ impl Ai {
     }
 
     #[allow(clippy::filter_map)]
-    fn dig(game: &super::game::Game, depth: u8, token: super::game::Token, factor: i64) -> i64 {
+    fn dig<Game: super::game::Game>(
+        game: &Game,
+        depth: u8,
+        token: super::game::Token,
+        factor: i64,
+    ) -> i64 {
         if depth > 0 {
             (0..super::game::Board::size())
                 .map(|x| game.place(token, x))
@@ -148,8 +155,8 @@ impl Ai {
 }
 
 impl Player for Ai {
-    fn play(&self, game: &super::game::Game) -> Result {
-        Result::Ok(self.best_move(game))
+    fn play<Game: super::game::Game>(&self, game: &Game) -> Result {
+        Result::Ok((self.best_move(game), self.token))
     }
 
     fn token(&self) -> super::game::Token {
