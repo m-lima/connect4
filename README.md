@@ -26,15 +26,16 @@ $ connect4
 ```
 
 ```bash
-USAGE:
-    connect4 [OPTIONS]
+Usage: connect4 [-h] [-v] [PLAYER [PLAYER]]
+    PLAYER:
+        h              Human player
+        a[level]       AI player, where level=difficulty
+    -h                 Show this help message
+    -v                 If an AI is present, make it verbose
 
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-
-OPTIONS:
-    -1, --p1 <PLAYER>    Sets the player 1 (a: AI, h: Human) [default: h]  [possible values: a, h]
-    -2, --p2 <PLAYER>    Sets the player 2 (a: AI, h: Human) [default: a]  [possible values: a, h]
-    -s, --size <SIZE>    Sets the size of the board [default: 8]
+Example:
+    connect4           White: Human, Black: AI[level=8]
+    connect4 a6 h      White: AI[level=6], Black: Human
+    connect4 h         White: Human, Black: Human
+    connect4 a a9      White: AI[level=8], Black: AI[level=9]
 ```

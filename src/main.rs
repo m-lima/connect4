@@ -27,6 +27,7 @@ fn usage() {
 }
 
 // TODO: Make the stateful canvas less messy
+//       If verbose, printing goes whack
 fn print<Game: game::Game>(game: &Game, error: &mut Option<String>, clear_size: usize) -> usize {
     for _ in 0..clear_size {
         print!("\x1b[0K");
