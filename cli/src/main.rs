@@ -2,9 +2,6 @@
 #![deny(clippy::pedantic)]
 #![warn(rust_2018_idioms)]
 
-mod game;
-mod player;
-
 enum Result {
     Players(player::Player, player::Player),
     Help,
@@ -29,11 +26,6 @@ fn usage() {
 // TODO: Make the stateful canvas less messy
 //       If verbose, printing goes whack
 fn print<Game: game::Game>(game: &Game, error: &mut Option<String>, clear_size: usize) -> usize {
-    for _ in 0..clear_size {
-        print!("\x1b[0K");
-        print!("\x1b[1A");
-    }
-    print!("\x1b[K");
     println!("{}", &game);
 
     if let Some(message) = error {
@@ -45,19 +37,12 @@ fn print<Game: game::Game>(game: &Game, error: &mut Option<String>, clear_size: 
     }
 }
 
-fn prepare_canvas() -> usize {
-    for _ in 0..11 {
-        println!();
-    }
-    11
-}
-
 fn start(white: &player::Player, black: &player::Player) {
     use game::Game;
     let mut game = game::new();
     let mut token = game::Token::White;
     let mut error: Option<String> = None;
-    let mut clear_size = prepare_canvas();
+    let mut canvas = Canvas::new(game.size() + 4);
 
     loop {
         clear_size = print(&game, &mut error, clear_size);

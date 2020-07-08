@@ -1,3 +1,7 @@
+#![deny(warnings)]
+#![deny(clippy::pedantic)]
+#![warn(rust_2018_idioms)]
+
 #[derive(Debug, PartialEq)]
 pub enum Error {
     OutOfBounds,
@@ -52,6 +56,7 @@ pub trait Game: Sized + Send + std::fmt::Display {
     fn plan(&self, token: Token, x: u8) -> Result<Status, Error>;
     fn status(&self) -> Status;
     fn size(&self) -> u8;
+    fn print(&self) -> usize;
 }
 
 pub fn new() -> impl Game {
@@ -168,6 +173,10 @@ impl Game for Connect4 {
 
     fn size(&self) -> u8 {
         Board::size()
+    }
+
+    fn print(&self) -> usize {
+
     }
 }
 

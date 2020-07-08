@@ -1,0 +1,29 @@
+body, html {
+  height: 100%;
+  width: 100%;
+
+  padding: 0;
+  margin: 0;
+
+  background-color: #333333;
+}
+
+.container {
+  height: min(100vh, 100vw);
+  width: min(100vh, 100vw);
+
+  margin-left: auto;
+  margin-right: auto;
+}
+
+circle {
+  fill: #999999;
+}
+
+circle.p1 {
+  fill: #5555cc;
+}
+
+circle.p2 {
+  fill: #cc5555;
+}

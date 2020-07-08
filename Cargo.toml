@@ -2,6 +2,13 @@
 name = "connect4"
 version = "0.1.0"
 edition = "2018"
+description = "A game of Connect 4"
+
+[workspace]
+members = [
+  "wasm",
+  "cli",
+]
 
 [dependencies]
 rand = "0.7"

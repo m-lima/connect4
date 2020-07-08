@@ -6,16 +6,6 @@ pub enum Result {
     Error(String),
 }
 
-impl std::fmt::Display for Result {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        if let Self::Error(message) = self {
-            write!(fmt, "{}", message)
-        } else {
-            Ok(())
-        }
-    }
-}
-
 pub enum Player {
     Ai(Ai),
     Human,
