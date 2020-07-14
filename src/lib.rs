@@ -2,11 +2,15 @@
 #![deny(clippy::pedantic)]
 #![warn(rust_2018_idioms)]
 
-#[derive(Debug, PartialEq)]
+mod ai;
+
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Error {
     OutOfBounds,
     ColumnFull,
 }
+
+impl std::error::Error for Error {}
 
 impl std::fmt::Display for Error {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -18,71 +22,64 @@ impl std::fmt::Display for Error {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum Status {
+pub enum State {
     Victory,
     Tie,
     Ongoing,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum Token {
-    White,
-    Black,
-}
-
-impl std::ops::Not for Token {
-    type Output = Self;
-
-    #[must_use]
-    fn not(self) -> Self::Output {
-        match self {
-            Self::White => Self::Black,
-            Self::Black => Self::White,
-        }
-    }
-}
-
-impl std::fmt::Display for Token {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::White => write!(fmt, "\u{2593}\u{2593}"),
-            Self::Black => write!(fmt, "\u{2591}\u{2591}"),
-        }
-    }
-}
-
-pub trait Game: Sized + Send + std::fmt::Display {
-    fn place(&self, token: Token, x: u8) -> Result<Self, Error>;
-    fn plan(&self, token: Token, x: u8) -> Result<Status, Error>;
-    fn status(&self) -> Status;
-    fn size(&self) -> u8;
-    fn print(&self) -> usize;
-}
-
-pub fn new() -> impl Game {
-    Connect4::new()
-}
-
-struct Connect4 {
+pub struct Game {
     board: Board,
-    status: Status,
+    state: State,
 }
 
-impl Connect4 {
-    fn new() -> Self {
+impl std::default::Default for Game {
+    fn default() -> Self {
+        Self::new(7)
+    }
+}
+
+impl Game {
+    pub fn new(size: u8) -> Self {
         Self {
-            board: Board::new(),
-            status: Status::Ongoing,
+            board: Board::new(size),
+            state: if size < 5 { State::Tie } else { State::Ongoing },
         }
     }
 
-    fn build_status(token: Token, position: &Position, board: &Board) -> Status {
+    #[allow(clippy::cast_sign_loss)]
+    pub fn place(&self, token: Token, x: u8) -> Result<Self, Error> {
+        let position = self.fall_position(x)?;
+        Ok({
+            let mut cells = self.board.cells.clone();
+            cells[self.board.to_linear_index(&position)] = Cell::Token(token);
+            let board = Board { cells, size: self.size() };
+            let status = Self::build_status(token, &position, &board);
+
+            Self { board, state: status }
+        })
+    }
+
+    pub fn plan(&self, token: Token, x: u8) -> Result<State, Error> {
+        let position = self.fall_position(x)?;
+        Ok(Self::build_status(token, &position, &self.board))
+    }
+
+    pub fn state(&self) -> State {
+        self.state
+    }
+
+    pub const fn size(&self) -> u8 {
+        self.board.size()
+    }
+
+    fn build_status(token: Token, position: &Position, board: &Board) -> State {
         if Self::tie(&position, &board) {
-            Status::Tie
+            State::Tie
         } else if Self::victory(token, &position, &board) {
-            Status::Victory
+            State::Victory
         } else {
-            Status::Ongoing
+            State::Ongoing
         }
     }
 
@@ -125,11 +122,11 @@ impl Connect4 {
 
     #[allow(clippy::cast_possible_wrap)]
     fn fall_position(&self, x: u8) -> Result<Position, Error> {
-        if x >= Board::size() {
+        if x >= self.size {
             return Err(Error::OutOfBounds);
         }
 
-        let position = self.fall_position_height(Position { x: x as i8, y: -1 });
+        let position = self.fall_position_height(Position { x: x as i16, y: -1 });
 
         if position.y < 0 {
             Err(Error::ColumnFull)
@@ -148,67 +145,22 @@ impl Connect4 {
     }
 }
 
-impl Game for Connect4 {
-    #[allow(clippy::cast_sign_loss)]
-    fn place(&self, token: Token, x: u8) -> Result<Self, Error> {
-        let position = self.fall_position(x)?;
-        Ok({
-            let mut cells = self.board.cells;
-            cells[position.y as usize][position.x as usize] = Cell::Token(token);
-            let board = Board { cells };
-            let status = Self::build_status(token, &position, &board);
-
-            Self { board, status }
-        })
-    }
-
-    fn plan(&self, token: Token, x: u8) -> Result<Status, Error> {
-        let position = self.fall_position(x)?;
-        Ok(Self::build_status(token, &position, &self.board))
-    }
-
-    fn status(&self) -> Status {
-        self.status
-    }
-
-    fn size(&self) -> u8 {
-        Board::size()
-    }
-
-    fn print(&self) -> usize {
-
-    }
-}
-
-impl std::fmt::Display for Connect4 {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for row in &self.board.cells {
-            for cell in row {
-                write!(fmt, "|{}", cell)?;
-            }
-            writeln!(fmt, "|")?;
-        }
-
-        for _ in 0..Board::size() {
-            write!(fmt, "---")?;
-        }
-        writeln!(fmt, "-")?;
-
-        for i in 0..Board::size() {
-            write!(fmt, " {:2}", i + 1)?;
-        }
-        writeln!(fmt)
-    }
-}
-
 struct Board {
-    cells: [[Cell; Self::usize()]; Self::usize()],
+    cells: Vec<Cell>,
+    size: u8,
+}
+
+impl std::default::Default for Board {
+    fn default() -> Self {
+        Self::new(7)
+    }
 }
 
 impl Board {
-    fn new() -> Self {
+    fn new(size: u8) -> Self {
         Self {
-            cells: [[Cell::Empty; Self::usize()]; Self::usize()],
+            cells: vec![Cell::Empty, size * size],
+            size,
         }
     }
 
@@ -216,12 +168,12 @@ impl Board {
     fn cell(&self, position: &Position) -> Cell {
         if position.x < 0
             || position.y < 0
-            || position.x as u8 >= Self::size()
-            || position.y as u8 >= Self::size()
+            || position.x as u8 >= self.size
+            || position.y as u8 >= self.size
         {
             Cell::OutOfBounds
         } else {
-            self.cells[position.y as usize][position.x as usize]
+            self.cells[self.to_linear_index(position)]
         }
     }
 
@@ -229,13 +181,16 @@ impl Board {
         self.cell(&position) == Cell::Token(token)
     }
 
-    const fn usize() -> usize {
-        7
+    const fn usize(&self) -> usize {
+        self.size as usize
     }
 
-    // TODO: Make dynamic
-    const fn size() -> u8 {
-        7
+    const fn size(&self) -> u8 {
+        self.size
+    }
+
+    const fn to_linear_index(&self, position: &Position) -> usize {
+        (position.x * self.board.size as i16 + position.y) as usize
     }
 }
 
@@ -246,20 +201,28 @@ enum Cell {
     Token(Token),
 }
 
-impl std::fmt::Display for Cell {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Token {
+    White,
+    Black,
+}
+
+impl std::ops::Not for Token {
+    type Output = Self;
+
+    #[must_use]
+    fn not(self) -> Self::Output {
         match self {
-            Self::Empty => write!(fmt, "  "),
-            Self::OutOfBounds => write!(fmt, ""),
-            Self::Token(p) => write!(fmt, "{}", p),
+            Self::White => Self::Black,
+            Self::Black => Self::White,
         }
     }
 }
 
 #[derive(Debug, Eq, PartialEq)]
 struct Position {
-    x: i8,
-    y: i8,
+    x: i16,
+    y: i16,
 }
 
 impl std::ops::Add<&Direction> for &Position {
@@ -268,8 +231,8 @@ impl std::ops::Add<&Direction> for &Position {
     #[must_use]
     fn add(self, direction: &Direction) -> Position {
         Position {
-            x: self.x + direction.x,
-            y: self.y + direction.y,
+            x: self.x + direction.x as i16,
+            y: self.y + direction.y as i16,
         }
     }
 }
@@ -302,34 +265,34 @@ mod tests {
 
         #[test]
         fn place() {
-            let mut game = Connect4::new();
+            let mut game = Game::new(7);
             game = game.place(Token::Black, 1).unwrap();
-            assert_eq!(game.status(), Status::Ongoing);
+            assert_eq!(game.status(), State::Ongoing);
             game = game.place(Token::White, 2).unwrap();
-            assert_eq!(game.status(), Status::Ongoing);
+            assert_eq!(game.status(), State::Ongoing);
             game = game.place(Token::Black, 3).unwrap();
-            assert_eq!(game.status(), Status::Ongoing);
+            assert_eq!(game.status(), State::Ongoing);
             game = game.place(Token::White, 3).unwrap();
-            assert_eq!(game.status(), Status::Ongoing);
+            assert_eq!(game.status(), State::Ongoing);
             game = game.place(Token::Black, 3).unwrap();
-            assert_eq!(game.status(), Status::Ongoing);
+            assert_eq!(game.status(), State::Ongoing);
             game = game.place(Token::White, 3).unwrap();
-            assert_eq!(game.status(), Status::Ongoing);
+            assert_eq!(game.status(), State::Ongoing);
             game = game.place(Token::Black, 4).unwrap();
-            assert_eq!(game.status(), Status::Ongoing);
+            assert_eq!(game.status(), State::Ongoing);
             game = game.place(Token::White, 1).unwrap();
-            assert_eq!(game.status(), Status::Ongoing);
+            assert_eq!(game.status(), State::Ongoing);
             game = game.place(Token::Black, 2).unwrap();
-            assert_eq!(game.status(), Status::Ongoing);
+            assert_eq!(game.status(), State::Ongoing);
             game = game.place(Token::White, 2).unwrap();
-            assert_eq!(game.status(), Status::Ongoing);
+            assert_eq!(game.status(), State::Ongoing);
             game = game.place(Token::White, 0).unwrap();
-            assert_eq!(game.status(), Status::Victory);
+            assert_eq!(game.status(), State::Victory);
         }
 
         #[test]
         fn place_errors() {
-            let mut game = Connect4::new();
+            let mut game = Game::new(7);
 
             game = game.place(Token::White, 3).unwrap();
             game = game.place(Token::White, 3).unwrap();
@@ -351,7 +314,7 @@ mod tests {
 
         #[test]
         fn victory() {
-            let mut game = Connect4::new();
+            let mut game = Game::new(7);
 
             game.board.cells[6][2] = Cell::Token(Token::Black);
             game.board.cells[5][2] = Cell::Token(Token::Black);
@@ -367,32 +330,32 @@ mod tests {
             game.board.cells[4][5] = Cell::Token(Token::Black);
 
             assert_eq!(
-                Connect4::victory(Token::Black, &Position { x: 2, y: 5 }, &game.board),
+                Game::victory(Token::Black, &Position { x: 2, y: 5 }, &game.board),
                 false
             );
             assert_eq!(
-                Connect4::victory(Token::White, &Position { x: 0, y: 1 }, &game.board),
+                Game::victory(Token::White, &Position { x: 0, y: 1 }, &game.board),
                 false
             );
             assert_eq!(
-                Connect4::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
+                Game::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
                 false
             );
 
             game.board.cells[3][3] = Cell::Token(Token::Black);
             assert_eq!(
-                Connect4::victory(Token::White, &Position { x: 5, y: 5 }, &game.board),
+                Game::victory(Token::White, &Position { x: 5, y: 5 }, &game.board),
                 false
             );
             assert_eq!(
-                Connect4::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
+                Game::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
                 true
             );
         }
 
         #[test]
         fn fall_position() {
-            let mut game = Connect4::new();
+            let mut game = Game::new(7);
             game.board.cells[3][2] = Cell::Token(Token::Black);
             game.board.cells[6][4] = Cell::Token(Token::White);
 
@@ -407,7 +370,7 @@ mod tests {
 
         #[test]
         fn out_of_bounds() {
-            let board = Board::new();
+            let board = Board::new(7);
             assert_eq!(board.cell(&Position { x: 8, y: 1 }), Cell::OutOfBounds);
             assert_eq!(board.cell(&Position { x: 1, y: 8 }), Cell::OutOfBounds);
             assert_eq!(board.cell(&Position { x: 8, y: 8 }), Cell::OutOfBounds);
@@ -416,7 +379,7 @@ mod tests {
 
         #[test]
         fn is_token() {
-            let mut board = Board::new();
+            let mut board = Board::new(7);
             board.cells[3][2] = Cell::Token(Token::Black);
 
             assert!(!board.is_token(Token::Black, &Position { x: 8, y: 8 }));

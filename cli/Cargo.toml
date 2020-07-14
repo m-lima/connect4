@@ -3,3 +3,6 @@ name = "connect4-cli"
 version = "0.1.0"
 edition = "2018"
 description = "A game of Connect 4 in the terminal"
+
+[dependencies]
+connect4 = { path = ".." }

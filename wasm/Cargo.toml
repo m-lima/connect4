@@ -1,5 +1,5 @@
 [package]
-name = "connect4"
+name = "connect4-wasm"
 version = "0.1.0"
 edition = "2018"
 description = "A game of Connect 4 in the browser"
