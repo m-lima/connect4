@@ -1,6 +1,7 @@
 #![deny(warnings)]
 #![deny(clippy::pedantic)]
 #![warn(rust_2018_idioms)]
+#![allow(clippy::missing_errors_doc)]
 
 mod ai;
 
@@ -40,6 +41,7 @@ impl std::default::Default for Game {
 }
 
 impl Game {
+    #[must_use]
     pub fn new(size: u8) -> Self {
         Self {
             board: Board::new(size),
@@ -47,42 +49,35 @@ impl Game {
         }
     }
 
-    #[allow(clippy::cast_sign_loss)]
-    pub fn place(&self, token: Token, x: u8) -> Result<Self, Error> {
+    pub fn place(&mut self, token: Token, x: u8) -> Result<(), Error> {
         let position = self.fall_position(x)?;
-        Ok({
-            let mut cells = self.board.cells.clone();
-            cells[self.board.index(position)] = Cell::Token(token);
-            let board = Board {
-                cells,
-                size: self.size(),
-            };
-            let state = Self::build_state(token, position, &board);
-
-            Self { board, state }
-        })
+        *self.board.cell_mut(position)? = Cell::Token(token);
+        self.update_state(token, position);
+        Ok(())
     }
 
-    pub fn plan(&self, token: Token, x: u8) -> Result<State, Error> {
-        let position = self.fall_position(x)?;
-        Ok(Self::build_state(token, position, &self.board))
-    }
+    // pub fn plan(&self, token: Token, x: u8) -> Result<State, Error> {
+    //     let position = self.fall_position(x)?;
+    //     Ok(Self::build_state(token, position, &self.board))
+    // }
 
-    pub fn state(&self) -> State {
+    #[must_use]
+    pub const fn state(&self) -> State {
         self.state
     }
 
+    #[must_use]
     pub const fn size(&self) -> u8 {
         self.board.size()
     }
 
-    fn build_state(token: Token, position: Position, board: &Board) -> State {
-        if Self::tie(position, &board) {
-            State::Tie
-        } else if Self::victory(token, position, &board) {
-            State::Victory
+    fn update_state(&mut self, token: Token, position: Position) {
+        if Self::tie(position, &self.board) {
+            self.state = State::Tie
+        } else if Self::victory(token, position, &self.board) {
+            self.state = State::Victory
         } else {
-            State::Ongoing
+            self.state = State::Ongoing
         }
     }
 
@@ -112,22 +107,26 @@ impl Game {
             > 4
     }
 
-    #[allow(clippy::cast_possible_wrap)]
     fn fall_position(&self, x: u8) -> Result<Position, Error> {
         if x >= self.size() {
             return Err(Error::OutOfBounds);
         }
 
-        let position = self
-            .board
-            .count(Cell::Empty, Position { x: x as i16, y: 0 }, Direction::S);
+        let position = self.board.count(
+            Cell::Empty,
+            Position {
+                x: i16::from(x),
+                y: 0,
+            },
+            Direction::S,
+        );
 
         if position == 0 {
             Err(Error::ColumnFull)
         } else {
             Ok(Position {
-                x: x as i16,
-                y: position as i16 - 1,
+                x: i16::from(x),
+                y: i16::from(position) - 1,
             })
         }
     }
@@ -138,12 +137,6 @@ struct Board {
     size: u8,
 }
 
-impl std::default::Default for Board {
-    fn default() -> Self {
-        Self::new(7)
-    }
-}
-
 impl Board {
     fn new(size: u8) -> Self {
         Self {
@@ -152,16 +145,19 @@ impl Board {
         }
     }
 
-    #[allow(clippy::cast_sign_loss)]
     fn cell(&self, position: Position) -> Cell {
-        if position.x < 0
-            || position.y < 0
-            || position.x as u8 >= self.size
-            || position.y as u8 >= self.size
-        {
+        if out_of_bounds(i16::from(self.size), position) {
             Cell::OutOfBounds
         } else {
-            self.cells[self.index(position)]
+            self.cells[index(self.size, position)]
+        }
+    }
+
+    fn cell_mut(&mut self, position: Position) -> Result<&mut Cell, Error> {
+        if out_of_bounds(i16::from(self.size), position) {
+            Err(Error::OutOfBounds)
+        } else {
+            Ok(&mut self.cells[index(self.size, position)])
         }
     }
 
@@ -169,11 +165,7 @@ impl Board {
         self.size
     }
 
-    const fn index(&self, position: Position) -> usize {
-        index(self.size, position)
-    }
-
-    fn iter(&self, position: Position, direction: Direction) -> BoardIterator<'_> {
+    const fn iter(&self, position: Position, direction: Direction) -> BoardIterator<'_> {
         BoardIterator {
             position,
             direction,
@@ -194,6 +186,12 @@ impl Board {
     }
 }
 
+fn out_of_bounds(size: i16, position: Position) -> bool {
+    position.x < 0 || position.y < 0 || position.x >= size || position.y >= size
+}
+
+// Allowed because it is a private function and it is checked before being called
+#[allow(clippy::cast_sign_loss)]
 const fn index(size: u8, position: Position) -> usize {
     (position.x * size as i16 + position.y) as usize
 }
@@ -209,11 +207,11 @@ impl std::iter::Iterator for BoardIterator<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let cell = self.board.cell(self.position);
-        if Cell::OutOfBounds != cell {
+        if Cell::OutOfBounds == cell {
+            None
+        } else {
             self.position += self.direction;
             Some(cell)
-        } else {
-            None
         }
     }
 }
@@ -252,25 +250,23 @@ struct Position {
 impl std::ops::Add<Direction> for Position {
     type Output = Position;
 
-    #[must_use]
     fn add(self, direction: Direction) -> Position {
         Position {
-            x: self.x + direction.x as i16,
-            y: self.y + direction.y as i16,
+            x: self.x + i16::from(direction.x),
+            y: self.y + i16::from(direction.y),
         }
     }
 }
 
 impl std::ops::AddAssign<Direction> for Position {
     fn add_assign(&mut self, direction: Direction) {
-        self.x += direction.x as i16;
-        self.y += direction.y as i16;
+        self.x += i16::from(direction.x);
+        self.y += i16::from(direction.y);
     }
 }
 
 impl Direction {
-    #[must_use]
-    fn reverse(&self) -> Self {
+    const fn reverse(self) -> Self {
         Self {
             x: -self.x,
             y: -self.y,
@@ -297,27 +293,27 @@ mod tests {
         #[test]
         fn place() {
             let mut game = Game::new(7);
-            game = game.place(Token::Black, 1).unwrap();
+            game.place(Token::Black, 1).unwrap();
             assert_eq!(game.state(), State::Ongoing);
-            game = game.place(Token::White, 2).unwrap();
+            game.place(Token::White, 2).unwrap();
             assert_eq!(game.state(), State::Ongoing);
-            game = game.place(Token::Black, 3).unwrap();
+            game.place(Token::Black, 3).unwrap();
             assert_eq!(game.state(), State::Ongoing);
-            game = game.place(Token::White, 3).unwrap();
+            game.place(Token::White, 3).unwrap();
             assert_eq!(game.state(), State::Ongoing);
-            game = game.place(Token::Black, 3).unwrap();
+            game.place(Token::Black, 3).unwrap();
             assert_eq!(game.state(), State::Ongoing);
-            game = game.place(Token::White, 3).unwrap();
+            game.place(Token::White, 3).unwrap();
             assert_eq!(game.state(), State::Ongoing);
-            game = game.place(Token::Black, 4).unwrap();
+            game.place(Token::Black, 4).unwrap();
             assert_eq!(game.state(), State::Ongoing);
-            game = game.place(Token::White, 1).unwrap();
+            game.place(Token::White, 1).unwrap();
             assert_eq!(game.state(), State::Ongoing);
-            game = game.place(Token::Black, 2).unwrap();
+            game.place(Token::Black, 2).unwrap();
             assert_eq!(game.state(), State::Ongoing);
-            game = game.place(Token::White, 2).unwrap();
+            game.place(Token::White, 2).unwrap();
             assert_eq!(game.state(), State::Ongoing);
-            game = game.place(Token::White, 0).unwrap();
+            game.place(Token::White, 0).unwrap();
             assert_eq!(game.state(), State::Victory);
         }
 
@@ -325,13 +321,13 @@ mod tests {
         fn place_errors() {
             let mut game = Game::new(7);
 
-            game = game.place(Token::White, 3).unwrap();
-            game = game.place(Token::White, 3).unwrap();
-            game = game.place(Token::White, 3).unwrap();
-            game = game.place(Token::White, 3).unwrap();
-            game = game.place(Token::White, 3).unwrap();
-            game = game.place(Token::White, 3).unwrap();
-            game = game.place(Token::White, 3).unwrap();
+            game.place(Token::White, 3).unwrap();
+            game.place(Token::White, 3).unwrap();
+            game.place(Token::White, 3).unwrap();
+            game.place(Token::White, 3).unwrap();
+            game.place(Token::White, 3).unwrap();
+            game.place(Token::White, 3).unwrap();
+            game.place(Token::White, 3).unwrap();
 
             assert_eq!(
                 game.place(Token::Black, 3).err().unwrap(),
