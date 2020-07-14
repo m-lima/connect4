@@ -26,13 +26,14 @@ impl AiResult {
 // TODO: Add tests
 impl Ai {
     pub fn new(token: super::Token, depth: u8, verbose: bool) -> Self {
-        Self { token, depth, verbose }
+        Self {
+            token,
+            depth,
+            verbose,
+        }
     }
 
-    pub fn play(
-        &self,
-        game: &super::Game,
-    ) -> u8 {
+    pub fn play(&self, game: &super::Game) -> u8 {
         let columns = Self::shuffle_columns(game.size());
         columns
             .into_iter()
@@ -67,10 +68,7 @@ impl Ai {
         columns
     }
 
-    fn calculate_score(
-        &self,
-        play: AiPlay<Result<super::Game, super::Error>>,
-    ) -> Option<AiResult> {
+    fn calculate_score(&self, play: AiPlay<Result<super::Game, super::Error>>) -> Option<AiResult> {
         match play.value {
             Ok(game) => {
                 if super::State::Victory == game.state() {
@@ -91,14 +89,9 @@ impl Ai {
         }
     }
 
-    fn dig(
-        game: &super::Game,
-        depth: u8,
-        token: super::Token,
-        factor: i64,
-    ) -> i64 {
+    fn dig(game: &super::Game, depth: u8, token: super::Token, factor: i64) -> i64 {
         if depth > 0 {
-                #[allow(clippy::filter_map)]
+            #[allow(clippy::filter_map)]
             (0..game.size())
                 .map(|col| game.place(token, col))
                 .filter_map(std::result::Result::ok)

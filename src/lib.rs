@@ -52,17 +52,23 @@ impl Game {
         let position = self.fall_position(x)?;
         Ok({
             let mut cells = self.board.cells.clone();
-            cells[self.board.to_linear_index(&position)] = Cell::Token(token);
-            let board = Board { cells, size: self.size() };
-            let status = Self::build_status(token, &position, &board);
+            cells[self.board.to_linear_index(position)] = Cell::Token(token);
+            let board = Board {
+                cells,
+                size: self.size(),
+            };
+            let status = Self::build_status(token, position, &board);
 
-            Self { board, state: status }
+            Self {
+                board,
+                state: status,
+            }
         })
     }
 
     pub fn plan(&self, token: Token, x: u8) -> Result<State, Error> {
         let position = self.fall_position(x)?;
-        Ok(Self::build_status(token, &position, &self.board))
+        Ok(Self::build_status(token, position, &self.board))
     }
 
     pub fn state(&self) -> State {
@@ -73,74 +79,59 @@ impl Game {
         self.board.size()
     }
 
-    fn build_status(token: Token, position: &Position, board: &Board) -> State {
-        if Self::tie(&position, &board) {
+    fn build_status(token: Token, position: Position, board: &Board) -> State {
+        if Self::tie(position, &board) {
             State::Tie
-        } else if Self::victory(token, &position, &board) {
+        } else if Self::victory(token, position, &board) {
             State::Victory
         } else {
             State::Ongoing
         }
     }
 
-    fn tie(position: &Position, board: &Board) -> bool {
-        position.y == 0 && !board.cells[0].iter().any(|c| *c == Cell::Empty)
+    fn tie(position: Position, board: &Board) -> bool {
+        position.y == 0
+            && board
+                .iter(Position { x: 0, y: 0 }, Direction::E)
+                .any(|c| c == Cell::Empty)
     }
 
-    fn victory(token: Token, position: &Position, board: &Board) -> bool {
-        Self::direction_score(token, position, &board, &Direction::S)
-            || Self::direction_score(token, position, &board, &Direction::E)
-            || Self::direction_score(token, position, &board, &Direction::NE)
-            || Self::direction_score(token, position, &board, &Direction::SE)
+    fn victory(token: Token, position: Position, board: &Board) -> bool {
+        Self::direction_victory(token, position, &board, Direction::S)
+            || Self::direction_victory(token, position, &board, Direction::E)
+            || Self::direction_victory(token, position, &board, Direction::NE)
+            || Self::direction_victory(token, position, &board, Direction::SE)
     }
 
-    fn direction_score(
-        token: Token,
-        position: &Position,
-        board: &Board,
-        direction: &Direction,
-    ) -> bool {
-        let reverse = &direction.reverse();
-        (Self::compound_direction_score(token, position + direction, &board, direction)
-            + Self::compound_direction_score(token, position + reverse, &board, reverse))
-            >= 3
-    }
-
-    #[allow(clippy::needless_pass_by_value)]
-    fn compound_direction_score(
+    fn direction_victory(
         token: Token,
         position: Position,
         board: &Board,
-        direction: &Direction,
-    ) -> u8 {
-        if board.is_token(token, &position) {
-            Self::compound_direction_score(token, &position + direction, &board, direction) + 1
-        } else {
-            0
-        }
+        direction: Direction,
+    ) -> bool {
+        let reverse = direction.reverse();
+        board.count(Cell::Token(token), position, direction)
+            + board.count(Cell::Token(token), position, reverse)
+            > 4
     }
 
     #[allow(clippy::cast_possible_wrap)]
     fn fall_position(&self, x: u8) -> Result<Position, Error> {
-        if x >= self.size {
+        if x >= self.size() {
             return Err(Error::OutOfBounds);
         }
 
-        let position = self.fall_position_height(Position { x: x as i16, y: -1 });
+        let position = self
+            .board
+            .count(Cell::Empty, Position { x: x as i16, y: 0 }, Direction::S);
 
-        if position.y < 0 {
+        if position == 0 {
             Err(Error::ColumnFull)
         } else {
-            Ok(position)
-        }
-    }
-
-    fn fall_position_height(&self, position: Position) -> Position {
-        let floor = &position + &Direction::S;
-        if Cell::Empty == self.board.cell(&floor) {
-            self.fall_position_height(floor)
-        } else {
-            position
+            Ok(Position {
+                x: x as i16,
+                y: position as i16,
+            })
         }
     }
 }
@@ -159,13 +150,13 @@ impl std::default::Default for Board {
 impl Board {
     fn new(size: u8) -> Self {
         Self {
-            cells: vec![Cell::Empty, size * size],
+            cells: vec![Cell::Empty; usize::from(size * size)],
             size,
         }
     }
 
     #[allow(clippy::cast_sign_loss)]
-    fn cell(&self, position: &Position) -> Cell {
+    fn cell(&self, position: Position) -> Cell {
         if position.x < 0
             || position.y < 0
             || position.x as u8 >= self.size
@@ -177,10 +168,6 @@ impl Board {
         }
     }
 
-    fn is_token(&self, token: Token, position: &Position) -> bool {
-        self.cell(&position) == Cell::Token(token)
-    }
-
     const fn usize(&self) -> usize {
         self.size as usize
     }
@@ -189,8 +176,48 @@ impl Board {
         self.size
     }
 
-    const fn to_linear_index(&self, position: &Position) -> usize {
-        (position.x * self.board.size as i16 + position.y) as usize
+    const fn to_linear_index(&self, position: Position) -> usize {
+        (position.x * self.size() as i16 + position.y) as usize
+    }
+
+    fn iter(&self, position: Position, direction: Direction) -> BoardIterator<'_> {
+        BoardIterator {
+            position,
+            direction,
+            board: &self,
+        }
+    }
+
+    fn count(&self, cell: Cell, position: Position, direction: Direction) -> u8 {
+        let mut counter = 0;
+        for c in self.iter(position, direction) {
+            if c == cell {
+                counter += 1;
+            } else {
+                break;
+            }
+        }
+        counter
+    }
+}
+
+struct BoardIterator<'a> {
+    position: Position,
+    direction: Direction,
+    board: &'a Board,
+}
+
+impl std::iter::Iterator for BoardIterator<'_> {
+    type Item = Cell;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let cell = self.board.cell(self.position);
+        if Cell::OutOfBounds != cell {
+            self.position += self.direction;
+            Some(cell)
+        } else {
+            None
+        }
     }
 }
 
@@ -219,21 +246,28 @@ impl std::ops::Not for Token {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 struct Position {
     x: i16,
     y: i16,
 }
 
-impl std::ops::Add<&Direction> for &Position {
+impl std::ops::Add<Direction> for Position {
     type Output = Position;
 
     #[must_use]
-    fn add(self, direction: &Direction) -> Position {
+    fn add(self, direction: Direction) -> Position {
         Position {
             x: self.x + direction.x as i16,
             y: self.y + direction.y as i16,
         }
+    }
+}
+
+impl std::ops::AddAssign<Direction> for Position {
+    fn add_assign(&mut self, direction: Direction) {
+        self.x += direction.x as i16;
+        self.y += direction.y as i16;
     }
 }
 
@@ -252,7 +286,7 @@ impl Direction {
     const S: Self = Self { x: 0, y: 1 };
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 struct Direction {
     x: i8,
     y: i8,
@@ -330,25 +364,25 @@ mod tests {
             game.board.cells[4][5] = Cell::Token(Token::Black);
 
             assert_eq!(
-                Game::victory(Token::Black, &Position { x: 2, y: 5 }, &game.board),
+                Game::victory(Token::Black, Position { x: 2, y: 5 }, &game.board),
                 false
             );
             assert_eq!(
-                Game::victory(Token::White, &Position { x: 0, y: 1 }, &game.board),
+                Game::victory(Token::White, Position { x: 0, y: 1 }, &game.board),
                 false
             );
             assert_eq!(
-                Game::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
+                Game::victory(Token::Black, Position { x: 5, y: 5 }, &game.board),
                 false
             );
 
             game.board.cells[3][3] = Cell::Token(Token::Black);
             assert_eq!(
-                Game::victory(Token::White, &Position { x: 5, y: 5 }, &game.board),
+                Game::victory(Token::White, Position { x: 5, y: 5 }, &game.board),
                 false
             );
             assert_eq!(
-                Game::victory(Token::Black, &Position { x: 5, y: 5 }, &game.board),
+                Game::victory(Token::Black, Position { x: 5, y: 5 }, &game.board),
                 true
             );
         }
@@ -371,21 +405,10 @@ mod tests {
         #[test]
         fn out_of_bounds() {
             let board = Board::new(7);
-            assert_eq!(board.cell(&Position { x: 8, y: 1 }), Cell::OutOfBounds);
-            assert_eq!(board.cell(&Position { x: 1, y: 8 }), Cell::OutOfBounds);
-            assert_eq!(board.cell(&Position { x: 8, y: 8 }), Cell::OutOfBounds);
-            assert_ne!(board.cell(&Position { x: 1, y: 1 }), Cell::OutOfBounds);
-        }
-
-        #[test]
-        fn is_token() {
-            let mut board = Board::new(7);
-            board.cells[3][2] = Cell::Token(Token::Black);
-
-            assert!(!board.is_token(Token::Black, &Position { x: 8, y: 8 }));
-            assert!(!board.is_token(Token::Black, &Position { x: 0, y: 0 }));
-            assert!(!board.is_token(Token::White, &Position { x: 2, y: 3 }));
-            assert!(board.is_token(Token::Black, &Position { x: 2, y: 3 }));
+            assert_eq!(board.cell(Position { x: 8, y: 1 }), Cell::OutOfBounds);
+            assert_eq!(board.cell(Position { x: 1, y: 8 }), Cell::OutOfBounds);
+            assert_eq!(board.cell(Position { x: 8, y: 8 }), Cell::OutOfBounds);
+            assert_ne!(board.cell(Position { x: 1, y: 1 }), Cell::OutOfBounds);
         }
     }
 
