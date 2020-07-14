@@ -52,23 +52,20 @@ impl Game {
         let position = self.fall_position(x)?;
         Ok({
             let mut cells = self.board.cells.clone();
-            cells[self.board.to_linear_index(position)] = Cell::Token(token);
+            cells[self.board.index(position)] = Cell::Token(token);
             let board = Board {
                 cells,
                 size: self.size(),
             };
-            let status = Self::build_status(token, position, &board);
+            let state = Self::build_state(token, position, &board);
 
-            Self {
-                board,
-                state: status,
-            }
+            Self { board, state }
         })
     }
 
     pub fn plan(&self, token: Token, x: u8) -> Result<State, Error> {
         let position = self.fall_position(x)?;
-        Ok(Self::build_status(token, position, &self.board))
+        Ok(Self::build_state(token, position, &self.board))
     }
 
     pub fn state(&self) -> State {
@@ -79,7 +76,7 @@ impl Game {
         self.board.size()
     }
 
-    fn build_status(token: Token, position: Position, board: &Board) -> State {
+    fn build_state(token: Token, position: Position, board: &Board) -> State {
         if Self::tie(position, &board) {
             State::Tie
         } else if Self::victory(token, position, &board) {
@@ -130,7 +127,7 @@ impl Game {
         } else {
             Ok(Position {
                 x: x as i16,
-                y: position as i16,
+                y: position as i16 - 1,
             })
         }
     }
@@ -164,20 +161,16 @@ impl Board {
         {
             Cell::OutOfBounds
         } else {
-            self.cells[self.to_linear_index(position)]
+            self.cells[self.index(position)]
         }
-    }
-
-    const fn usize(&self) -> usize {
-        self.size as usize
     }
 
     const fn size(&self) -> u8 {
         self.size
     }
 
-    const fn to_linear_index(&self, position: Position) -> usize {
-        (position.x * self.size() as i16 + position.y) as usize
+    const fn index(&self, position: Position) -> usize {
+        index(self.size, position)
     }
 
     fn iter(&self, position: Position, direction: Direction) -> BoardIterator<'_> {
@@ -199,6 +192,10 @@ impl Board {
         }
         counter
     }
+}
+
+const fn index(size: u8, position: Position) -> usize {
+    (position.x * size as i16 + position.y) as usize
 }
 
 struct BoardIterator<'a> {
@@ -301,27 +298,27 @@ mod tests {
         fn place() {
             let mut game = Game::new(7);
             game = game.place(Token::Black, 1).unwrap();
-            assert_eq!(game.status(), State::Ongoing);
+            assert_eq!(game.state(), State::Ongoing);
             game = game.place(Token::White, 2).unwrap();
-            assert_eq!(game.status(), State::Ongoing);
+            assert_eq!(game.state(), State::Ongoing);
             game = game.place(Token::Black, 3).unwrap();
-            assert_eq!(game.status(), State::Ongoing);
+            assert_eq!(game.state(), State::Ongoing);
             game = game.place(Token::White, 3).unwrap();
-            assert_eq!(game.status(), State::Ongoing);
+            assert_eq!(game.state(), State::Ongoing);
             game = game.place(Token::Black, 3).unwrap();
-            assert_eq!(game.status(), State::Ongoing);
+            assert_eq!(game.state(), State::Ongoing);
             game = game.place(Token::White, 3).unwrap();
-            assert_eq!(game.status(), State::Ongoing);
+            assert_eq!(game.state(), State::Ongoing);
             game = game.place(Token::Black, 4).unwrap();
-            assert_eq!(game.status(), State::Ongoing);
+            assert_eq!(game.state(), State::Ongoing);
             game = game.place(Token::White, 1).unwrap();
-            assert_eq!(game.status(), State::Ongoing);
+            assert_eq!(game.state(), State::Ongoing);
             game = game.place(Token::Black, 2).unwrap();
-            assert_eq!(game.status(), State::Ongoing);
+            assert_eq!(game.state(), State::Ongoing);
             game = game.place(Token::White, 2).unwrap();
-            assert_eq!(game.status(), State::Ongoing);
+            assert_eq!(game.state(), State::Ongoing);
             game = game.place(Token::White, 0).unwrap();
-            assert_eq!(game.status(), State::Victory);
+            assert_eq!(game.state(), State::Victory);
         }
 
         #[test]
@@ -348,20 +345,21 @@ mod tests {
 
         #[test]
         fn victory() {
-            let mut game = Game::new(7);
+            let size = 7;
+            let mut game = Game::new(size);
 
-            game.board.cells[6][2] = Cell::Token(Token::Black);
-            game.board.cells[5][2] = Cell::Token(Token::Black);
-            game.board.cells[4][2] = Cell::Token(Token::Black);
-            game.board.cells[3][2] = Cell::Token(Token::White);
+            game.board.cells[index(size, Position { x: 2, y: 6 })] = Cell::Token(Token::Black);
+            game.board.cells[index(size, Position { x: 2, y: 5 })] = Cell::Token(Token::Black);
+            game.board.cells[index(size, Position { x: 2, y: 4 })] = Cell::Token(Token::Black);
+            game.board.cells[index(size, Position { x: 2, y: 3 })] = Cell::Token(Token::White);
 
-            game.board.cells[0][0] = Cell::Token(Token::White);
-            game.board.cells[1][0] = Cell::Token(Token::White);
+            game.board.cells[index(size, Position { x: 0, y: 0 })] = Cell::Token(Token::White);
+            game.board.cells[index(size, Position { x: 0, y: 1 })] = Cell::Token(Token::White);
 
-            game.board.cells[6][6] = Cell::Token(Token::Black);
-            game.board.cells[5][5] = Cell::Token(Token::Black);
-            game.board.cells[4][4] = Cell::Token(Token::Black);
-            game.board.cells[4][5] = Cell::Token(Token::Black);
+            game.board.cells[index(size, Position { x: 6, y: 6 })] = Cell::Token(Token::Black);
+            game.board.cells[index(size, Position { x: 5, y: 5 })] = Cell::Token(Token::Black);
+            game.board.cells[index(size, Position { x: 4, y: 4 })] = Cell::Token(Token::Black);
+            game.board.cells[index(size, Position { x: 5, y: 4 })] = Cell::Token(Token::Black);
 
             assert_eq!(
                 Game::victory(Token::Black, Position { x: 2, y: 5 }, &game.board),
@@ -376,7 +374,7 @@ mod tests {
                 false
             );
 
-            game.board.cells[3][3] = Cell::Token(Token::Black);
+            game.board.cells[index(size, Position { x: 3, y: 3 })] = Cell::Token(Token::Black);
             assert_eq!(
                 Game::victory(Token::White, Position { x: 5, y: 5 }, &game.board),
                 false
@@ -389,9 +387,10 @@ mod tests {
 
         #[test]
         fn fall_position() {
-            let mut game = Game::new(7);
-            game.board.cells[3][2] = Cell::Token(Token::Black);
-            game.board.cells[6][4] = Cell::Token(Token::White);
+            let size = 7;
+            let mut game = Game::new(size);
+            game.board.cells[index(size, Position { x: 2, y: 3 })] = Cell::Token(Token::Black);
+            game.board.cells[index(size, Position { x: 4, y: 6 })] = Cell::Token(Token::White);
 
             assert_eq!(game.fall_position(0).unwrap(), Position { x: 0, y: 6 });
             assert_eq!(game.fall_position(2).unwrap(), Position { x: 2, y: 2 });
@@ -417,8 +416,8 @@ mod tests {
 
         #[test]
         fn translation() {
-            let position = &Position { x: 2, y: 3 };
-            let direction = &Direction { x: -9, y: 1 };
+            let position = Position { x: 2, y: 3 };
+            let direction = Direction { x: -9, y: 1 };
             assert_eq!(position + direction, Position { x: -7, y: 4 });
         }
 
