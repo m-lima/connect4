@@ -67,13 +67,13 @@ pub enum State {
 #[cfg(test)]
 mod test {
     use super::State;
-    use crate::board;
+    use crate::board::Board;
     use crate::board::Token::{Black, White};
     use crate::cartesian::Position;
 
     #[test]
     fn place() {
-        let mut board = board::new(7);
+        let mut board = Board::new(7);
         let state = super::place(&mut board, Black, 1).unwrap();
         assert_eq!(state, State::Ongoing);
         let state = super::place(&mut board, White, 2).unwrap();
@@ -125,24 +125,24 @@ mod test {
         let size = 7;
         let mut board = Board::new(size);
 
-        board.cells[index(size, Position::new(2, 6))] = Token(Black);
-        board.cells[index(size, Position::new(2, 5))] = Token(Black);
-        board.cells[index(size, Position::new(2, 4))] = Token(Black);
-        board.cells[index(size, Position::new(2, 3))] = Token(White);
+        board.set_cell(Position::new(2, 6), Black).unwrap();
+        board.set_cell(Position::new(2, 5), Black).unwrap();
+        board.set_cell(Position::new(2, 4), Black).unwrap();
+        board.set_cell(Position::new(2, 3), White).unwrap();
 
-        board.cells[index(size, Position::new(0, 0))] = Token(White);
-        board.cells[index(size, Position::new(0, 1))] = Token(White);
+        board.set_cell(Position::new(0, 0), White).unwrap();
+        board.set_cell(Position::new(0, 1), White).unwrap();
 
-        board.cells[index(size, Position::new(6, 6))] = Token(Black);
-        board.cells[index(size, Position::new(5, 5))] = Token(Black);
-        board.cells[index(size, Position::new(4, 4))] = Token(Black);
-        board.cells[index(size, Position::new(5, 4))] = Token(Black);
+        board.set_cell(Position::new(6, 6), Black).unwrap();
+        board.set_cell(Position::new(5, 5), Black).unwrap();
+        board.set_cell(Position::new(4, 4), Black).unwrap();
+        board.set_cell(Position::new(5, 4), Black).unwrap();
 
         assert_eq!(super::victory(&board, Black, Position::new(2, 5)), false);
         assert_eq!(super::victory(&board, White, Position::new(0, 1)), false);
         assert_eq!(super::victory(&board, Black, Position::new(5, 5)), false);
 
-        board.cells[index(size, Position::new(3, 3))] = Token(Black);
+        board.set_cell(Position::new(3, 3), Black).unwrap();
         assert_eq!(super::victory(&board, White, Position::new(5, 5)), false);
         assert_eq!(super::victory(&board, Black, Position::new(5, 5)), true);
     }
@@ -151,8 +151,8 @@ mod test {
     fn fall_position() {
         let size = 7;
         let mut board = Board::new(size);
-        board.cells[index(size, Position::new(2, 3))] = Token(Black);
-        board.cells[index(size, Position::new(4, 6))] = Token(White);
+        board.set_cell(Position::new(2, 3), Black).unwrap();
+        board.set_cell(Position::new(4, 6), White).unwrap();
 
         assert_eq!(
             super::fall_position(&board, 0).unwrap(),

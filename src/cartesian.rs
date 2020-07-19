@@ -15,11 +15,11 @@ impl Position {
         Self { x, y }
     }
 
-    pub const fn x(&self) -> i16 {
+    pub const fn x(self) -> i16 {
         self.x
     }
 
-    pub const fn y(&self) -> i16 {
+    pub const fn y(self) -> i16 {
         self.y
     }
 }

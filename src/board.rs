@@ -6,19 +6,21 @@ pub struct Board {
     size: u8,
 }
 
-#[must_use]
-pub fn new(size: u8) -> Board {
-    Board {
-        cells: vec![Token::Empty; usize::from(size * size)],
-        size,
-    }
-}
-
 impl Board {
+    #[must_use]
+    pub fn new(size: u8) -> Self {
+        Self {
+            cells: vec![Token::Empty; usize::from(size * size)],
+            size,
+        }
+    }
+
+    #[must_use]
     pub const fn size(&self) -> u8 {
         self.size
     }
 
+    #[must_use]
     pub fn cell(&self, position: Position) -> Option<Token> {
         if out_of_bounds(i16::from(self.size), position) {
             None
@@ -27,8 +29,9 @@ impl Board {
         }
     }
 
-    pub const fn iter(&self, position: Position, direction: Direction) -> BoardIterator<'_> {
-        BoardIterator {
+    #[must_use]
+    pub const fn iter(&self, position: Position, direction: Direction) -> Iterator<'_> {
+        Iterator {
             position,
             direction,
             board: &self,
@@ -55,7 +58,8 @@ impl Board {
         if out_of_bounds(i16::from(self.size), position) {
             Err(crate::Error::OutOfBounds)
         } else {
-            Ok(self.cells[index(self.size, position)] = token)
+            self.cells[index(self.size, position)] = token;
+            Ok(())
         }
     }
 }
@@ -79,13 +83,13 @@ const fn index(size: u8, position: Position) -> usize {
     (position.x() * size as i16 + position.y()) as usize
 }
 
-pub struct BoardIterator<'a> {
+pub struct Iterator<'a> {
     position: Position,
     direction: Direction,
     board: &'a Board,
 }
 
-impl std::iter::Iterator for BoardIterator<'_> {
+impl std::iter::Iterator for Iterator<'_> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -119,14 +123,15 @@ impl std::ops::Not for Token {
 
 #[cfg(test)]
 mod test {
+    use super::Board;
     use crate::cartesian::Position;
 
     #[test]
     fn out_of_bounds() {
         let board = Board::new(7);
-        assert_eq!(board.cell(Position::new(8, 1)), super::Cell::OutOfBounds);
-        assert_eq!(board.cell(Position::new(1, 8)), super::Cell::OutOfBounds);
-        assert_eq!(board.cell(Position::new(8, 8)), super::Cell::OutOfBounds);
-        assert_ne!(board.cell(Position::new(1, 1)), super::Cell::OutOfBounds);
+        assert_eq!(board.cell(Position::new(8, 1)), None);
+        assert_eq!(board.cell(Position::new(1, 8)), None);
+        assert_eq!(board.cell(Position::new(8, 8)), None);
+        assert_ne!(board.cell(Position::new(1, 1)), None);
     }
 }
