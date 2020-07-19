@@ -1,5 +1,10 @@
+use crate::board::Board;
+use crate::board::Token;
+use crate::game;
+use crate::game::State;
+
 pub struct Ai {
-    token: super::Token,
+    token: Token,
     depth: u8,
     verbose: bool,
 }
@@ -26,7 +31,7 @@ impl Result {
 // TODO: Add tests
 impl Ai {
     #[must_use]
-    pub fn new(token: super::Token, depth: u8, verbose: bool) -> Self {
+    pub fn new(token: Token, depth: u8, verbose: bool) -> Self {
         Self {
             token,
             depth,
@@ -35,7 +40,7 @@ impl Ai {
     }
 
     #[must_use]
-    pub fn play(&self, board: &super::Board) -> u8 {
+    pub fn play(&self, board: &Board) -> u8 {
         shuffle_columns(board.size())
             .into_iter()
             .filter_map(|col| self.to_threads(board.clone(), col))
@@ -55,13 +60,13 @@ impl Ai {
             .col
     }
 
-    fn to_threads(&self, mut board: super::Board, col: u8) -> Option<Result> {
-        match super::Game::place(&mut board, self.token, col) {
-            Ok(super::State::Victory) => Some(Result::Static(Play {
+    fn to_threads(&self, mut board: Board, col: u8) -> Option<Result> {
+        match game::place(&mut board, self.token, col) {
+            Ok(State::Victory) => Some(Result::Static(Play {
                 col,
                 value: 7_i64.pow(u32::from(self.depth)),
             })),
-            Ok(super::State::Ongoing) if self.depth > 0 => {
+            Ok(State::Ongoing) if self.depth > 0 => {
                 let depth = self.depth;
                 let token = self.token;
                 Some(Result::Threaded(std::thread::spawn(move || Play {
@@ -82,16 +87,10 @@ fn shuffle_columns(size: u8) -> Vec<u8> {
     columns
 }
 
-fn score_for_column(
-    mut board: super::Board,
-    col: u8,
-    depth: u8,
-    token: super::Token,
-    factor: i64,
-) -> i64 {
-    match super::Game::place(&mut board, token, col) {
-        Ok(super::State::Victory) => 7_i64.pow(u32::from(depth)) * factor,
-        Ok(super::State::Ongoing) if depth > 0 => (0..board.size())
+fn score_for_column(mut board: Board, col: u8, depth: u8, token: Token, factor: i64) -> i64 {
+    match game::place(&mut board, token, col) {
+        Ok(State::Victory) => 7_i64.pow(u32::from(depth)) * factor,
+        Ok(State::Ongoing) if depth > 0 => (0..board.size())
             .map(|col| score_for_column(board.clone(), col, depth - 1, !token, -factor))
             .sum::<i64>(),
         _ => 0,
