@@ -4,19 +4,18 @@ pub struct Ai {
     verbose: bool,
 }
 
-struct AiPlay<T> {
+struct Play<T> {
     col: u8,
-    board: super::Board,
     value: T,
 }
 
-enum AiResult {
-    Threaded(std::thread::JoinHandle<AiPlay<i64>>),
-    Static(AiPlay<i64>),
+enum Result {
+    Threaded(std::thread::JoinHandle<Play<i64>>),
+    Static(Play<i64>),
 }
 
-impl AiResult {
-    fn resolve(self) -> Option<AiPlay<i64>> {
+impl Result {
+    fn resolve(self) -> Option<Play<i64>> {
         match self {
             Self::Threaded(r) => r.join().ok(),
             Self::Static(r) => Some(r),
@@ -24,13 +23,9 @@ impl AiResult {
     }
 }
 
-// struct GamePlan<'a> {
-//     board: &'a super::Board,
-//     plays: Vec<Play>,
-// }
-
 // TODO: Add tests
 impl Ai {
+    #[must_use]
     pub fn new(token: super::Token, depth: u8, verbose: bool) -> Self {
         Self {
             token,
@@ -39,92 +34,74 @@ impl Ai {
         }
     }
 
+    #[must_use]
     pub fn play(&self, board: &super::Board) -> u8 {
-        let columns = Self::shuffle_columns(board.size());
-        columns
+        shuffle_columns(board.size())
             .into_iter()
-            .filter_map(|col| self.calculate_score(board, col))
-            .collect::<Vec<_>>()
-            .into_iter()
-            .filter_map(AiResult::resolve)
+            .filter_map(|col| self.to_threads(board.clone(), col))
+            .filter_map(Result::resolve)
             .inspect(|play| {
                 if self.verbose {
                     println!("Score for {}: {}", play.col + 1, play.value);
                 }
             })
             .fold(
-                AiPlay {
+                Play {
                     col: rand::random::<u8>() % board.size(),
-                    board: super::Board::new(0),
                     value: i64::min_value(),
                 },
-                Self::max_score,
+                max_score,
             )
             .col
     }
 
-    fn shuffle_columns(size: u8) -> Vec<u8> {
-        use rand::seq::SliceRandom;
-        let mut rng = rand::thread_rng();
-        let mut columns = (0..size).collect::<Vec<_>>();
-        columns.shuffle(&mut rng);
-        columns
-    }
-
-    fn calculate_score(&self, board: &super::Board, col: u8) -> Option<AiResult> {
-        let mut board = board.clone();
+    fn to_threads(&self, mut board: super::Board, col: u8) -> Option<Result> {
         match super::Game::place(&mut board, self.token, col) {
-            Ok(game) => {
-                if super::State::Victory == game.state() {
-                    Some(AiResult::Static(AiPlay {
-                        col,
-                        board,
-                        value: 7_i64.pow(u32::from(self.depth)),
-                    }))
-                } else if self.depth > 0 {
-                    Some(AiResult::Threaded(std::thread::spawn(move || AiPlay {
-                        col,
-                        board,
-                        value: Self::dig(self.depth - 1, !self.token, -1),
-                    })))
-                } else {
-                    None
-                }
+            Ok(super::State::Victory) => Some(Result::Static(Play {
+                col,
+                value: 7_i64.pow(u32::from(self.depth)),
+            })),
+            Ok(super::State::Ongoing) if self.depth > 0 => {
+                let depth = self.depth;
+                let token = self.token;
+                Some(Result::Threaded(std::thread::spawn(move || Play {
+                    col,
+                    value: score_for_column(board.clone(), col, depth - 1, !token, -1),
+                })))
             }
-            Err(_) => None,
+            _ => None,
         }
     }
+}
 
-    fn dig(depth: u8, token: super::Token, factor: i64) -> i64 {
-        if depth > 0 {
-            #[allow(clippy::filter_map)]
-            (0..game.size())
-                .map(|col| game.place(token, col))
-                .filter_map(std::result::Result::ok)
-                .map(|game| {
-                    if super::State::Victory == game.state() {
-                        factor * 7_i64.pow(u32::from(depth))
-                    } else {
-                        Self::dig(depth - 1, !token, -factor)
-                    }
-                })
-                .sum::<i64>()
-        } else {
-            (0..game.size())
-                .map(|col| game.plan(token, col))
-                .filter_map(std::result::Result::ok)
-                .filter(|state| super::State::Victory == *state)
-                .count() as i64
-                * factor
-                * i64::from(depth)
-        }
+fn shuffle_columns(size: u8) -> Vec<u8> {
+    use rand::seq::SliceRandom;
+    let mut rng = rand::thread_rng();
+    let mut columns = (0..size).collect::<Vec<_>>();
+    columns.shuffle(&mut rng);
+    columns
+}
+
+fn score_for_column(
+    mut board: super::Board,
+    col: u8,
+    depth: u8,
+    token: super::Token,
+    factor: i64,
+) -> i64 {
+    match super::Game::place(&mut board, token, col) {
+        Ok(super::State::Victory) => 7_i64.pow(u32::from(depth)) * factor,
+        Ok(super::State::Ongoing) if depth > 0 => (0..board.size())
+            .map(|col| score_for_column(board.clone(), col, depth - 1, !token, -factor))
+            .sum::<i64>(),
+        _ => 0,
     }
+}
 
-    fn max_score(left: AiPlay<i64>, right: AiPlay<i64>) -> AiPlay<i64> {
-        if left.value > right.value {
-            left
-        } else {
-            right
-        }
+fn max_score(left: Play<i64>, right: Play<i64>) -> Play<i64> {
+    if left.value > right.value {
+        left
+    } else {
+        right
     }
 }

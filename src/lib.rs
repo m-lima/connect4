@@ -3,7 +3,7 @@
 #![warn(rust_2018_idioms)]
 #![allow(clippy::missing_errors_doc)]
 
-mod ai;
+pub mod ai;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Error {
@@ -105,18 +105,11 @@ pub struct Board {
 }
 
 impl Board {
-    fn new(size: u8) -> Self {
+    #[must_use]
+    pub fn new(size: u8) -> Self {
         Self {
             cells: vec![Cell::Empty; usize::from(size * size)],
             size,
-        }
-    }
-
-    #[must_use]
-    fn clone(&self) -> Self {
-        Self {
-            cells: self.cells.clone(),
-            size: self.size,
         }
     }
 
@@ -158,6 +151,15 @@ impl Board {
             }
         }
         counter
+    }
+}
+
+impl std::clone::Clone for Board {
+    fn clone(&self) -> Self {
+        Self {
+            cells: self.cells.clone(),
+            size: self.size,
+        }
     }
 }
 
