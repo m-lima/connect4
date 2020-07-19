@@ -2,14 +2,14 @@ use crate::cartesian::Direction;
 use crate::cartesian::Position;
 
 pub struct Board {
-    cells: Vec<Cell>,
+    cells: Vec<Token>,
     size: u8,
 }
 
 #[must_use]
 pub fn new(size: u8) -> Board {
     Board {
-        cells: vec![Cell::Empty; usize::from(size * size)],
+        cells: vec![Token::Empty; usize::from(size * size)],
         size,
     }
 }
@@ -17,6 +17,14 @@ pub fn new(size: u8) -> Board {
 impl Board {
     pub const fn size(&self) -> u8 {
         self.size
+    }
+
+    pub fn cell(&self, position: Position) -> Option<Token> {
+        if out_of_bounds(i16::from(self.size), position) {
+            None
+        } else {
+            Some(self.cells[index(self.size, position)])
+        }
     }
 
     pub const fn iter(&self, position: Position, direction: Direction) -> BoardIterator<'_> {
@@ -27,10 +35,10 @@ impl Board {
         }
     }
 
-    pub(super) fn count(&self, cell: Cell, position: Position, direction: Direction) -> u8 {
+    pub(super) fn count(&self, token: Token, position: Position, direction: Direction) -> u8 {
         let mut counter = 0;
-        for c in self.iter(position, direction) {
-            if c == cell {
+        for t in self.iter(position, direction) {
+            if t == token {
                 counter += 1;
             } else {
                 break;
@@ -39,19 +47,15 @@ impl Board {
         counter
     }
 
-    pub(super) fn set_cell(&mut self, position: Position, cell: Cell) -> Result<(), crate::Error> {
+    pub(super) fn set_cell(
+        &mut self,
+        position: Position,
+        token: Token,
+    ) -> Result<(), crate::Error> {
         if out_of_bounds(i16::from(self.size), position) {
             Err(crate::Error::OutOfBounds)
         } else {
-            Ok(self.cells[index(self.size, position)] = cell)
-        }
-    }
-
-    fn cell(&self, position: Position) -> Cell {
-        if out_of_bounds(i16::from(self.size), position) {
-            Cell::OutOfBounds
-        } else {
-            self.cells[index(self.size, position)]
+            Ok(self.cells[index(self.size, position)] = token)
         }
     }
 }
@@ -82,28 +86,20 @@ pub struct BoardIterator<'a> {
 }
 
 impl std::iter::Iterator for BoardIterator<'_> {
-    type Item = Cell;
+    type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
         let cell = self.board.cell(self.position);
-        if Cell::OutOfBounds == cell {
-            None
-        } else {
+        if cell.is_some() {
             self.position += self.direction;
-            Some(cell)
         }
+        cell
     }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum Cell {
-    Empty,
-    OutOfBounds,
-    Token(Token),
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Token {
+    Empty,
     White,
     Black,
 }
@@ -116,6 +112,7 @@ impl std::ops::Not for Token {
         match self {
             Self::White => Self::Black,
             Self::Black => Self::White,
+            Self::Empty => Self::Empty,
         }
     }
 }

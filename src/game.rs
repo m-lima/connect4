@@ -1,12 +1,11 @@
 use crate::board::Board;
-use crate::board::Cell;
 use crate::board::Token;
 use crate::cartesian::Direction;
 use crate::cartesian::Position;
 
 pub fn place(board: &mut Board, token: Token, x: u8) -> Result<State, crate::Error> {
     let position = fall_position(board, x)?;
-    board.set_cell(position, Cell::Token(token))?;
+    board.set_cell(position, token)?;
     Ok(update_state(&board, token, position))
 }
 
@@ -24,7 +23,7 @@ fn tie(board: &Board, position: Position) -> bool {
     position.y() == 0
         && board
             .iter(Position::new(0, 0), Direction::E)
-            .any(|c| c == Cell::Empty)
+            .any(|c| c == Token::Empty)
 }
 
 fn victory(board: &Board, token: Token, position: Position) -> bool {
@@ -41,9 +40,7 @@ fn direction_victory(
     direction: Direction,
 ) -> bool {
     let reverse = direction.reverse();
-    board.count(Cell::Token(token), position, direction)
-        + board.count(Cell::Token(token), position, reverse)
-        > 4
+    board.count(token, position, direction) + board.count(token, position, reverse) > 4
 }
 
 fn fall_position(board: &Board, x: u8) -> Result<Position, crate::Error> {
@@ -51,7 +48,7 @@ fn fall_position(board: &Board, x: u8) -> Result<Position, crate::Error> {
         return Err(crate::Error::OutOfBounds);
     }
 
-    let position = board.count(Cell::Empty, Position::new(i16::from(x), 0), Direction::S);
+    let position = board.count(Token::Empty, Position::new(i16::from(x), 0), Direction::S);
 
     if position == 0 {
         Err(crate::Error::ColumnFull)
@@ -71,7 +68,6 @@ pub enum State {
 mod test {
     use super::State;
     use crate::board;
-    use crate::board::Cell::Token;
     use crate::board::Token::{Black, White};
     use crate::cartesian::Position;
 
