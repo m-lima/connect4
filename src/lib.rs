@@ -29,76 +29,43 @@ pub enum State {
     Ongoing,
 }
 
-pub struct Game {
-    board: Board,
-    state: State,
-}
-
-impl std::default::Default for Game {
-    fn default() -> Self {
-        Self::new(7)
-    }
-}
+pub struct Game {}
 
 impl Game {
-    #[must_use]
-    pub fn new(size: u8) -> Self {
-        Self {
-            board: Board::new(size),
-            state: if size < 5 { State::Tie } else { State::Ongoing },
-        }
+    pub fn place(board: &mut Board, token: Token, x: u8) -> Result<State, Error> {
+        let position = Self::fall_position(board, x)?;
+        *board.cell_mut(position)? = Cell::Token(token);
+        Ok(Self::update_state(&board, token, position))
     }
 
-    pub fn place(&mut self, token: Token, x: u8) -> Result<(), Error> {
-        let position = self.fall_position(x)?;
-        *self.board.cell_mut(position)? = Cell::Token(token);
-        self.update_state(token, position);
-        Ok(())
-    }
-
-    // pub fn plan(&self, token: Token, x: u8) -> Result<State, Error> {
-    //     let position = self.fall_position(x)?;
-    //     Ok(Self::build_state(token, position, &self.board))
-    // }
-
-    #[must_use]
-    pub const fn state(&self) -> State {
-        self.state
-    }
-
-    #[must_use]
-    pub const fn size(&self) -> u8 {
-        self.board.size()
-    }
-
-    fn update_state(&mut self, token: Token, position: Position) {
-        if Self::tie(position, &self.board) {
-            self.state = State::Tie
-        } else if Self::victory(token, position, &self.board) {
-            self.state = State::Victory
+    fn update_state(board: &Board, token: Token, position: Position) -> State {
+        if Self::tie(board, position) {
+            State::Tie
+        } else if Self::victory(board, token, position) {
+            State::Victory
         } else {
-            self.state = State::Ongoing
+            State::Ongoing
         }
     }
 
-    fn tie(position: Position, board: &Board) -> bool {
+    fn tie(board: &Board, position: Position) -> bool {
         position.y == 0
             && board
                 .iter(Position { x: 0, y: 0 }, Direction::E)
                 .any(|c| c == Cell::Empty)
     }
 
-    fn victory(token: Token, position: Position, board: &Board) -> bool {
-        Self::direction_victory(token, position, &board, Direction::S)
-            || Self::direction_victory(token, position, &board, Direction::E)
-            || Self::direction_victory(token, position, &board, Direction::NE)
-            || Self::direction_victory(token, position, &board, Direction::SE)
+    fn victory(board: &Board, token: Token, position: Position) -> bool {
+        Self::direction_victory(board, token, position, Direction::S)
+            || Self::direction_victory(&board, token, position, Direction::E)
+            || Self::direction_victory(&board, token, position, Direction::NE)
+            || Self::direction_victory(&board, token, position, Direction::SE)
     }
 
     fn direction_victory(
+        board: &Board,
         token: Token,
         position: Position,
-        board: &Board,
         direction: Direction,
     ) -> bool {
         let reverse = direction.reverse();
@@ -107,12 +74,12 @@ impl Game {
             > 4
     }
 
-    fn fall_position(&self, x: u8) -> Result<Position, Error> {
-        if x >= self.size() {
+    fn fall_position(board: &Board, x: u8) -> Result<Position, Error> {
+        if x >= board.size {
             return Err(Error::OutOfBounds);
         }
 
-        let position = self.board.count(
+        let position = board.count(
             Cell::Empty,
             Position {
                 x: i16::from(x),
@@ -132,7 +99,7 @@ impl Game {
     }
 }
 
-struct Board {
+pub struct Board {
     cells: Vec<Cell>,
     size: u8,
 }
@@ -142,6 +109,14 @@ impl Board {
         Self {
             cells: vec![Cell::Empty; usize::from(size * size)],
             size,
+        }
+    }
+
+    #[must_use]
+    fn clone(&self) -> Self {
+        Self {
+            cells: self.cells.clone(),
+            size: self.size,
         }
     }
 
