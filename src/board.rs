@@ -64,6 +64,24 @@ impl Board {
     }
 }
 
+impl std::fmt::Display for Board {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for row in 0..self.size {
+            let pos = Position::new(0, row as i16);
+            for token in self.iter(pos, Direction::E) {
+                let token = match token {
+                    Token::White => 'X',
+                    Token::Black => 'O',
+                    Token::Empty => '_',
+                };
+                write!(fmt, "{} ", token)?;
+            }
+            writeln!(fmt)?;
+        }
+        Ok(())
+    }
+}
+
 impl std::clone::Clone for Board {
     fn clone(&self) -> Self {
         Self {
