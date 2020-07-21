@@ -64,14 +64,14 @@ impl Board {
     }
 }
 
-impl std::fmt::Display for Board {
+impl std::fmt::Debug for Board {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for row in 0..self.size {
-            let pos = Position::new(0, row as i16);
+            let pos = Position::new(0, i16::from(row));
             for token in self.iter(pos, Direction::E) {
                 let token = match token {
-                    Token::White => 'X',
-                    Token::Black => 'O',
+                    Token::White => 'O',
+                    Token::Black => 'X',
                     Token::Empty => '_',
                 };
                 write!(fmt, "{} ", token)?;
@@ -101,6 +101,7 @@ const fn index(size: u8, position: Position) -> usize {
     (position.x() * size as i16 + position.y()) as usize
 }
 
+#[derive(Debug)]
 pub struct Iterator<'a> {
     position: Position,
     direction: Direction,
