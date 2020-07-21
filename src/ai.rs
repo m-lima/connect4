@@ -191,4 +191,16 @@ mod test {
         let ai = Ai::new(Token::Black, 1, true);
         assert_ne!(ai.play(&board), 4);
     }
+
+    #[test]
+    fn go_for_trap() {
+        let mut board = Board::new(7);
+        place!(board; b; 2, 3, 6, 6);
+        place!(board; w; 2, 3, 2, 3);
+        println!("{:#?}", board);
+
+        let ai = Ai::new(Token::Black, 4, true);
+        let play = ai.play(&board);
+        assert!(play == 1 || play == 4);
+    }
 }
