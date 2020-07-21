@@ -2,10 +2,22 @@
 #![deny(clippy::pedantic)]
 #![warn(rust_2018_idioms)]
 
+use connect4::ai::Ai;
+use connect4::board::Board;
+use connect4::board::Token;
+use connect4::game;
+
+mod canvas;
+
 enum Result {
-    Players(player::Player, player::Player),
+    Players(Player, Player, u8),
     Help,
     Error,
+}
+
+enum Player {
+    Human,
+    Ai(Ai),
 }
 
 fn usage() {
@@ -13,6 +25,7 @@ fn usage() {
     println!("    PLAYER:");
     println!("        h              Human player");
     println!("        a[level]       AI player, where level=difficulty");
+    println!("    s<size>            Set the size of the board");
     println!("    -h                 Show this help message");
     println!("    -v                 If an AI is present, make it verbose");
     println!();
@@ -21,76 +34,62 @@ fn usage() {
     println!("    connect4 a6 h      White: AI[level=6], Black: Human");
     println!("    connect4 h         White: Human, Black: Human");
     println!("    connect4 a a9      White: AI[level=8], Black: AI[level=9]");
+    println!("    connect4 s9 a a    White: AI[level=8], Black: AI[level=8], Board: 9x9");
 }
 
-// TODO: Make the stateful canvas less messy
-//       If verbose, printing goes whack
-fn print<Game: game::Game>(game: &Game, error: &mut Option<String>, clear_size: usize) -> usize {
-    println!("{}", &game);
-
-    if let Some(message) = error {
-        println!("Error: {}", message);
-        *error = None;
-        12
-    } else {
-        11
-    }
-}
-
-fn start(white: &player::Player, black: &player::Player) {
-    use game::Game;
-    let mut game = game::new();
+fn start(white: &Player, black: &Player, size: u8) {
+    let mut board = Board::new(size);
     let mut token = game::Token::White;
-    let mut error: Option<String> = None;
-    let mut canvas = Canvas::new(game.size() + 4);
+    let mut canvas = Canvas::new(size + 4);
 
     loop {
         clear_size = print(&game, &mut error, clear_size);
-
-        let play = match token {
-            game::Token::White => white.play(&game, token),
-            game::Token::Black => black.play(&game, token),
-        };
-
-        match play {
-            player::Result::Ok(input) => match game.place(token, input) {
-                Ok(new_state) => {
-                    game = new_state;
-                    match game.status() {
-                        game::Status::Victory => {
-                            print(&game, &mut None, clear_size);
-                            println!("Player {} won by playing {}", token, input + 1);
-                            break;
-                        }
-                        game::Status::Tie => {
-                            print(&game, &mut None, clear_size);
-                            println!("It's a draw...");
-                            break;
-                        }
-                        _ => {}
-                    }
-                    token = !token;
-                }
-                Err(e) => {
-                    error = Some(e.to_string());
-                }
-            },
-            player::Result::Error(message) => {
-                error = Some(message);
-            }
-            player::Result::Repeat => {}
-            player::Result::Quit => {
-                break;
-            }
-        }
+        //
+        //     let play = match token {
+        //         game::Token::White => white.play(&game, token),
+        //         game::Token::Black => black.play(&game, token),
+        //     };
+        //
+        //     match play {
+        //         player::Result::Ok(input) => match game.place(token, input) {
+        //             Ok(new_state) => {
+        //                 game = new_state;
+        //                 match game.status() {
+        //                     game::Status::Victory => {
+        //                         print(&game, &mut None, clear_size);
+        //                         println!("Player {} won by playing {}", token, input + 1);
+        //                         break;
+        //                     }
+        //                     game::Status::Tie => {
+        //                         print(&game, &mut None, clear_size);
+        //                         println!("It's a draw...");
+        //                         break;
+        //                     }
+        //                     _ => {}
+        //                 }
+        //                 token = !token;
+        //             }
+        //             Err(e) => {
+        //                 error = Some(e.to_string());
+        //             }
+        //         },
+        //         player::Result::Error(message) => {
+        //             error = Some(message);
+        //         }
+        //         player::Result::Repeat => {}
+        //         player::Result::Quit => {
+        //             break;
+        //         }
+        //     }
     }
 }
 
 fn parse_args() -> Result {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     let mut verbose = false;
-    let mut white: Option<player::Player> = None;
-    let mut black: Option<player::Player> = None;
+    let mut white: Option<Player> = None;
+    let mut black: Option<Player> = None;
+    let mut size = 7_u8;
 
     for arg in &args {
         match arg.as_str() {
@@ -108,9 +107,9 @@ fn parse_args() -> Result {
             }
             "h" => {
                 if white.is_none() {
-                    white = Some(player::Player::Human)
+                    white = Some(Player::Human)
                 } else if black.is_none() {
-                    black = Some(player::Player::Human)
+                    black = Some(Player::Human)
                 }
             }
             _ => {
@@ -124,12 +123,19 @@ fn parse_args() -> Result {
                         };
                         if let Ok(level) = level {
                             if white.is_none() {
-                                white = Some(player::Player::Ai(player::Ai::new(level, verbose)));
+                                white = Some(Player::Ai(Ai::new(Token::White, level, verbose)));
                                 continue;
                             } else if black.is_none() {
-                                black = Some(player::Player::Ai(player::Ai::new(level, verbose)));
+                                black = Some(Player::Ai(Ai::new(Token::Black, level, verbose)));
                                 continue;
                             }
+                        }
+                    } else if c == 's' {
+                        let size_string = arg.chars().skip(1).collect::<String>();
+                        if let Ok(parsed_size) = size_string.parse::<u8>() {
+                            size = parsed_size;
+                        } else {
+                            return Result::Error;
                         }
                     }
                 }
@@ -139,8 +145,9 @@ fn parse_args() -> Result {
     }
 
     Result::Players(
-        white.unwrap_or_else(|| player::Player::Ai(player::Ai::new(8, verbose))),
-        black.unwrap_or_else(|| player::Player::Human),
+        white.unwrap_or_else(|| Player::Ai(Ai::new(Token::White, 8, verbose))),
+        black.unwrap_or_else(|| Player::Human),
+        size,
     )
 }
 
@@ -154,8 +161,8 @@ fn main() {
             println!();
             usage();
         }
-        Result::Players(white, black) => {
-            start(&white, &black);
+        Result::Players(white, black, size) => {
+            start(&white, &black, size);
         }
     }
 }

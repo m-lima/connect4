@@ -18,11 +18,11 @@ impl Canvas {
 
     pub fn print_header(&mut self, error: &str) {
         println!(error);
-        self.height += error.chars().filter(|c|  c == &'\n').count() + 1;
+        self.height += error.chars().filter(|c| c == &'\n').count() + 1;
     }
 
     pub fn print_game<Game: super::game::Game>(&mut self, game: Game) {
-//        self.height += game.size() + 4;
+        //        self.height += game.size() + 4;
     }
     pub fn print_footer(&mut self) {
         let a: String = String::new();
