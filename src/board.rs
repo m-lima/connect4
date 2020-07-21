@@ -70,15 +70,25 @@ impl std::fmt::Debug for Board {
             let pos = Position::new(0, i16::from(row));
             for token in self.iter(pos, Direction::E) {
                 let token = match token {
-                    Token::White => 'O',
-                    Token::Black => 'X',
-                    Token::Empty => '_',
+                    Token::White => "\u{2593}\u{2593}",
+                    Token::Black => "\u{2591}\u{2591}",
+                    Token::Empty => "  ",
                 };
-                write!(fmt, "{} ", token)?;
+                write!(fmt, "|{}", token)?;
             }
-            writeln!(fmt)?;
+            writeln!(fmt, "|")?;
         }
-        Ok(())
+
+        for _ in 0..self.size {
+            write!(fmt, "---")?;
+        }
+
+        writeln!(fmt, "-")?;
+
+        for i in 0..self.size {
+            write!(fmt, " {:2}", i + 1)?;
+        }
+        writeln!(fmt)
     }
 }
 
